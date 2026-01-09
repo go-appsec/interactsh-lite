@@ -13,6 +13,7 @@ A lightweight, dependency-minimal Go client for [Interactsh](https://github.com/
 - Thread-safe client with clear state machine
 - Session persistence for long-running tests
 - Compatible with public Interactsh servers and self-hosted instances
+- Standalone CLI tool (`interactshlite`)
 
 ## Supported Protocols
 
@@ -25,13 +26,13 @@ The client can detect the following out-of-band interaction types:
 | SMTP/SMTPS | Email interactions with MAIL FROM capture |
 | LDAP | LDAP search query interactions |
 
-## Installation
+## Library
+
+### Library Quick Start
 
 ```bash
 go get github.com/go-harden/interactsh-lite@latest
 ```
-
-## Quick Start
 
 ```go
 package main
@@ -42,7 +43,7 @@ import (
     "log"
     "time"
 
-    "github.com/go-harden/interactsh-lite/pkg/oobclient"
+    "github.com/go-harden/interactsh-lite/oobclient"
 )
 
 func main() {
@@ -74,9 +75,9 @@ func main() {
 }
 ```
 
-## Usage Examples
+### Usage Examples
 
-### Custom Server Configuration
+#### Custom Server Configuration
 
 ```go
 client, err := oobclient.New(ctx, &oobclient.Options{
@@ -87,7 +88,7 @@ client, err := oobclient.New(ctx, &oobclient.Options{
 })
 ```
 
-### Session Persistence
+#### Session Persistence
 
 Save and restore sessions to maintain the same correlation ID across restarts:
 
@@ -97,7 +98,7 @@ if err := client.SaveSession("/tmp/session.yaml"); err != nil {
     log.Fatal(err)
 }
 
-// Later, restore the session
+// Later, restore the session (optionally pass opts to override behavioral settings)
 client, err := oobclient.LoadSession(ctx, "/tmp/session.yaml")
 if err != nil {
     log.Fatal(err)
@@ -107,7 +108,7 @@ defer client.Close()
 // Previously generated payload URLs still work
 ```
 
-### Error Handling
+#### Error Handling
 
 ```go
 import "errors"
@@ -126,7 +127,7 @@ if errors.Is(err, oobclient.ErrClientClosed) {
 }
 ```
 
-### Base Domain vs Unique URLs
+#### Base Domain vs Unique URLs
 
 ```go
 // Domain() returns the base domain (static for client lifetime)
@@ -140,23 +141,23 @@ url2 := client.URL()
 // Example: "cn4h7pjqdka31f8e5g6bkne9wfg4a3mt1.oast.pro" (20 + 13 chars)
 ```
 
-## Migration from ProjectDiscovery/Interactsh
+### Migration from ProjectDiscovery/Interactsh
 
 This library is a mostly drop-in replacement for the [official Interactsh](https://github.com/projectdiscovery/interactsh) client with a simplified API.
 
 **Binary size:** If ProjectDiscovery is not already in your dependency tree, switching to `interactsh-lite` can reduce your compiled binary size by up to 20MB.
 
-### Import Changes
+#### Import Changes
 
 ```diff
  import (
 -    "github.com/projectdiscovery/interactsh/pkg/client"
 -    "github.com/projectdiscovery/interactsh/pkg/server"
-+    "github.com/go-harden/interactsh-lite/pkg/oobclient"
++    "github.com/go-harden/interactsh-lite/oobclient"
  )
 ```
 
-### Client Creation
+#### Client Creation
 
 ```diff
 -opts := client.DefaultOptions
@@ -173,7 +174,7 @@ Key differences:
 - `ServerURL` (string) is now `ServerURLs` ([]string)
 - Pass `nil` for options to use defaults
 
-### Polling for Interactions
+#### Polling for Interactions
 
 ```diff
 -c.StartPolling(interval, func(i *server.Interaction) {
@@ -184,7 +185,7 @@ Key differences:
 
 The `Interaction` struct fields are identical.
 
-### Closing the Client
+#### Closing the Client
 
 ```diff
 -c.StopPolling()
@@ -192,14 +193,14 @@ The `Interaction` struct fields are identical.
 +c.Close()  // Automatically stops polling
 ```
 
-### Session Persistence
+#### Session Persistence
 
 ```diff
 -c.SaveSessionTo("/path/to/session.yaml")
 +c.SaveSession("/path/to/session.yaml")
 ```
 
-### Error Handling
+#### Module Error Handling
 
 ```diff
 -if err != nil && strings.Contains(err.Error(), "unauthorized") {
@@ -208,9 +209,9 @@ The `Interaction` struct fields are identical.
  }
 ```
 
-## API Reference
+### API Reference
 
-### Types
+#### Types
 
 | Type | Description |
 |------|-------------|
@@ -219,7 +220,7 @@ The `Interaction` struct fields are identical.
 | `Interaction` | Captured OOB interaction data |
 | `InteractionCallback` | Callback function type for polling |
 
-### Sentinel Errors
+#### Sentinel Errors
 
 | Error | Description |
 |-------|-------------|
@@ -229,3 +230,89 @@ The `Interaction` struct fields are identical.
 | `ErrAlreadyPolling` | StartPolling called while already polling |
 | `ErrNotPolling` | StopPolling called while not polling |
 
+## CLI Tool
+
+```bash
+go install github.com/go-harden/interactsh-lite/cmd/interactshlite@latest
+```
+
+### CLI Usage
+
+The `interactshlite` command provides a standalone tool for OOB interaction detection, compatible with the original `interactsh-client`.
+
+#### Basic Usage
+
+```bash
+# Generate payload and poll for interactions
+interactshlite
+
+# Generate multiple payloads
+interactshlite -n 5
+
+# Use a specific server
+interactshlite -s oast.pro
+
+# JSON output for scripting
+interactshlite --json
+
+# Verbose output with full request/response data
+interactshlite -v
+```
+
+### CLI Flags
+
+| Flag | Description |
+|------|-------------|
+| `-s, --server` | Interactsh server(s) to use (comma-separated) |
+| `-n, --number` | Number of payloads to generate |
+| `-t, --token` | Authentication token for protected servers |
+| `--config` | Path to config file |
+| `--poll-interval, --pi` | Poll interval in seconds (default: 5) |
+| `--keep-alive-interval, --kai` | Keep-alive interval (default: 1m) |
+| `--session-file, --sf` | Session file for persistence across restarts |
+| `--dns-only` | Display only DNS interactions |
+| `--http-only` | Display only HTTP interactions |
+| `--smtp-only` | Display only SMTP interactions |
+| `-m, --match` | Regex pattern to include interactions |
+| `-f, --filter` | Regex pattern to exclude interactions |
+| `-o, --output` | Output file path |
+| `--json` | Output in JSON format |
+| `-v, --verbose` | Verbose output with request/response data |
+| `--payload-store, --ps` | Store generated payloads to file |
+| `--payload-store-file, --psf` | Payload store file path (default: interactsh_payload.txt) |
+| `--health-check, --hc` | Run diagnostic checks |
+| `--version` | Show version |
+
+### Configuration File
+
+Create `~/.config/interactsh-client/config.yaml`:
+
+```yaml
+server: "oast.fun,oast.me"
+token: ""
+poll-interval: 5
+keep-alive-interval: 1m
+json: false
+verbose: false
+```
+
+CLI flags override config file values.
+
+### CLI Examples
+
+```bash
+# Filter to show only DNS A record interactions
+interactshlite --dns-only -v
+
+# Match specific patterns in interactions
+interactshlite -m "ssrf.*" -m "xxe.*"
+
+# Save payloads to file for later use
+interactshlite -n 10 --payload-store --payload-store-file payloads.txt
+
+# Use session file to persist correlation ID
+interactshlite --session-file session.yaml
+
+# Run health check diagnostics
+interactshlite --health-check
+```

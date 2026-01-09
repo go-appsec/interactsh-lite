@@ -610,6 +610,10 @@ func (c *Client) SaveSession(path string) error {
 // LoadSession restores a client from previously saved session credentials.
 // The context controls the timeout/cancellation of the re-registration request.
 //
+// If opts is provided, behavioral settings (KeepAliveInterval, DisableHTTPFallback,
+// HTTPTimeout, CorrelationIdNonceLength) are applied. Crypto material and server URL
+// are always restored from the session file.
+//
 // If the server still has the session, re-registration succeeds silently.
 // If the session was evicted, the client re-registers with the same credentials,
 // preserving the correlation-id and allowing continued use of previously
@@ -617,7 +621,7 @@ func (c *Client) SaveSession(path string) error {
 //
 // Returns an error if the session file cannot be read, parsed, or if
 // re-registration fails.
-func LoadSession(ctx context.Context, path string) (*Client, error) {
+func LoadSession(ctx context.Context, path string, opts ...*Options) (*Client, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read session file: %w", err)
@@ -641,6 +645,32 @@ func LoadSession(ctx context.Context, path string) (*Client, error) {
 		return nil, fmt.Errorf("failed to parse server URL: %w", err)
 	}
 
+	// Apply options or use defaults
+	httpTimeout := DefaultOptions.HTTPTimeout
+	keepAliveInterval := DefaultOptions.KeepAliveInterval
+	correlationIDNonceLength := DefaultOptions.CorrelationIdNonceLength
+	var disableHTTPFallback bool
+	var httpClient *http.Client
+
+	if len(opts) > 0 && opts[0] != nil {
+		opt := opts[0]
+		if opt.HTTPTimeout > 0 {
+			httpTimeout = opt.HTTPTimeout
+		}
+		if opt.KeepAliveInterval > 0 {
+			keepAliveInterval = opt.KeepAliveInterval
+		}
+		if opt.CorrelationIdNonceLength > 0 {
+			correlationIDNonceLength = opt.CorrelationIdNonceLength
+		}
+		disableHTTPFallback = opt.DisableHTTPFallback
+		httpClient = opt.HTTPClient
+	}
+
+	if httpClient == nil {
+		httpClient = newSecureHTTPClient(httpTimeout)
+	}
+
 	client := &Client{
 		serverURL:                serverURL,
 		correlationID:            session.CorrelationID,
@@ -649,14 +679,20 @@ func LoadSession(ctx context.Context, path string) (*Client, error) {
 		privateKey:               privateKey,
 		publicKey:                publicKey,
 		publicKeyB64:             session.PublicKey,
-		httpClient:               newSecureHTTPClient(DefaultOptions.HTTPTimeout),
-		correlationIDNonceLength: DefaultOptions.CorrelationIdNonceLength,
+		httpClient:               httpClient,
+		correlationIDNonceLength: correlationIDNonceLength,
+		keepAliveInterval:        keepAliveInterval,
+		disableHTTPFallback:      disableHTTPFallback,
 		state:                    stateIdle,
 	}
 
 	// Re-register with server (silently succeeds if session still exists)
 	if err := client.performRegistration(ctx, serverURL); err != nil {
 		return nil, fmt.Errorf("failed to re-register session: %w", err)
+	}
+
+	if client.keepAliveInterval > 0 {
+		client.startKeepAlive()
 	}
 
 	return client, nil
