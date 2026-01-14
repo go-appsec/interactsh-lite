@@ -23,7 +23,7 @@ func TestRunHealthCheck(t *testing.T) {
 		output := buf.String()
 
 		assert.Contains(t, output, "Version: 1.0.0-test")
-		assert.Contains(t, output, "Operative System: "+runtime.GOOS)
+		assert.Contains(t, output, "Operating System: "+runtime.GOOS)
 		assert.Contains(t, output, "Architecture: "+runtime.GOARCH)
 		assert.Contains(t, output, "Go Version: "+runtime.Version())
 		assert.Contains(t, output, "Compiler: "+runtime.Compiler)
@@ -60,7 +60,7 @@ func TestHealthCheckOutput(t *testing.T) {
 
 	var hasOS, hasArch, hasGoVersion, hasCompiler bool
 	for _, line := range lines {
-		if strings.HasPrefix(line, "Operative System:") {
+		if strings.HasPrefix(line, "Operating System:") {
 			hasOS = true
 		} else if strings.HasPrefix(line, "Architecture:") {
 			hasArch = true

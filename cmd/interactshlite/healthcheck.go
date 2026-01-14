@@ -15,7 +15,7 @@ const dialTimeout = 5 * time.Second
 // RunHealthCheck performs diagnostic checks and writes results to w.
 func RunHealthCheck(w io.Writer, version, configPath string) {
 	_, _ = fmt.Fprintf(w, "Version: %s\n", version)
-	_, _ = fmt.Fprintf(w, "Operative System: %s\n", runtime.GOOS)
+	_, _ = fmt.Fprintf(w, "Operating System: %s\n", runtime.GOOS)
 	_, _ = fmt.Fprintf(w, "Architecture: %s\n", runtime.GOARCH)
 	_, _ = fmt.Fprintf(w, "Go Version: %s\n", runtime.Version())
 	_, _ = fmt.Fprintf(w, "Compiler: %s\n", runtime.Compiler)
