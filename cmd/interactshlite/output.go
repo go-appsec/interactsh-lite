@@ -20,13 +20,13 @@ func formatStandard(w io.Writer, i *oobclient.Interaction, verbose bool) error {
 	switch strings.ToLower(i.Protocol) {
 	case "dns":
 		line = fmt.Sprintf("[%s] Received %s interaction (%s) from %s at %s",
-			i.FullID, protocol, i.QType, i.RemoteAddress, timestamp)
+			i.FullId, protocol, i.QType, i.RemoteAddress, timestamp)
 	case "smb", "responder":
 		line = fmt.Sprintf("[%s] Received %s interaction at %s",
-			i.FullID, protocol, timestamp)
+			i.FullId, protocol, timestamp)
 	default:
 		line = fmt.Sprintf("[%s] Received %s interaction from %s at %s",
-			i.FullID, protocol, i.RemoteAddress, timestamp)
+			i.FullId, protocol, i.RemoteAddress, timestamp)
 	}
 
 	if _, err := fmt.Fprintln(w, line); err != nil {
@@ -47,7 +47,7 @@ func formatStandard(w io.Writer, i *oobclient.Interaction, verbose bool) error {
 type jsonInteraction struct {
 	Protocol      string    `json:"protocol"`
 	UniqueID      string    `json:"unique-id"`
-	FullID        string    `json:"full-id"`
+	FullId        string    `json:"full-id"`
 	QType         string    `json:"q-type,omitempty"`
 	RawRequest    string    `json:"raw-request,omitempty"`
 	RawResponse   string    `json:"raw-response,omitempty"`
@@ -60,7 +60,7 @@ func formatJSON(w io.Writer, i *oobclient.Interaction) error {
 	ji := jsonInteraction{
 		Protocol:      strings.ToLower(i.Protocol),
 		UniqueID:      i.UniqueID,
-		FullID:        i.FullID,
+		FullId:        i.FullId,
 		QType:         i.QType,
 		RawRequest:    i.RawRequest,
 		RawResponse:   i.RawResponse,
@@ -115,7 +115,7 @@ func shouldDisplay(i *oobclient.Interaction, dnsOnly, httpOnly, smtpOnly bool, m
 	}
 
 	matchesInteraction := func(re *regexp.Regexp, i *oobclient.Interaction) bool {
-		return re.MatchString(i.FullID) || re.MatchString(i.RawRequest) ||
+		return re.MatchString(i.FullId) || re.MatchString(i.RawRequest) ||
 			re.MatchString(i.RawResponse) || re.MatchString(i.RemoteAddress)
 	}
 

@@ -15,8 +15,8 @@ type Config struct {
 	Number                   int           `yaml:"number"`
 	PollInterval             int           `yaml:"poll-interval"`
 	NoHTTPFallback           bool          `yaml:"no-http-fallback"`
-	CorrelationIDLength      int           `yaml:"correlation-id-length"`
-	CorrelationIDNonceLength int           `yaml:"correlation-id-nonce-length"`
+	CorrelationIdLength      int           `yaml:"correlation-id-length"`
+	CorrelationIdNonceLength int           `yaml:"correlation-id-nonce-length"`
 	KeepAliveInterval        time.Duration `yaml:"keep-alive-interval"`
 	DNSOnly                  bool          `yaml:"dns-only"`
 	HTTPOnly                 bool          `yaml:"http-only"`
@@ -31,8 +31,8 @@ func LoadConfig(path string) (Config, error) {
 		Server:                   "oast.pro,oast.live,oast.site,oast.online,oast.fun,oast.me",
 		Number:                   1,
 		PollInterval:             5,
-		CorrelationIDLength:      20,
-		CorrelationIDNonceLength: 13,
+		CorrelationIdLength:      20,
+		CorrelationIdNonceLength: 13,
 		KeepAliveInterval:        time.Minute,
 	}
 

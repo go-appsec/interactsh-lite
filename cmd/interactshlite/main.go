@@ -123,10 +123,10 @@ func main() {
 		cfg.NoHTTPFallback = noHTTPFallback
 	}
 	if pflag.Lookup("correlation-id-length").Changed || pflag.Lookup("cidl").Changed {
-		cfg.CorrelationIDLength = cidLength
+		cfg.CorrelationIdLength = cidLength
 	}
 	if pflag.Lookup("correlation-id-nonce-length").Changed || pflag.Lookup("cidn").Changed {
-		cfg.CorrelationIDNonceLength = cidnLength
+		cfg.CorrelationIdNonceLength = cidnLength
 	}
 	if pflag.Lookup("keep-alive-interval").Changed || pflag.Lookup("kai").Changed {
 		cfg.KeepAliveInterval = keepAliveFlag
@@ -188,8 +188,8 @@ func main() {
 		Token:                    cfg.Token,
 		KeepAliveInterval:        cfg.KeepAliveInterval,
 		DisableHTTPFallback:      cfg.NoHTTPFallback,
-		CorrelationIdLength:      cfg.CorrelationIDLength,
-		CorrelationIdNonceLength: cfg.CorrelationIDNonceLength,
+		CorrelationIdLength:      cfg.CorrelationIdLength,
+		CorrelationIdNonceLength: cfg.CorrelationIdNonceLength,
 	}
 
 	ctx := context.Background()

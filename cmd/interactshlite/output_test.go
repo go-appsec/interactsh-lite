@@ -27,7 +27,7 @@ func TestFormatStandard(t *testing.T) {
 			name: "dns_standard",
 			interaction: &oobclient.Interaction{
 				Protocol:      "dns",
-				FullID:        "abc123xyz",
+				FullId:        "abc123xyz",
 				QType:         "A",
 				RemoteAddress: "172.253.226.100",
 				Timestamp:     ts,
@@ -43,7 +43,7 @@ func TestFormatStandard(t *testing.T) {
 			name: "http_standard",
 			interaction: &oobclient.Interaction{
 				Protocol:      "http",
-				FullID:        "http123",
+				FullId:        "http123",
 				RemoteAddress: "43.22.22.50",
 				Timestamp:     ts,
 			},
@@ -57,7 +57,7 @@ func TestFormatStandard(t *testing.T) {
 			name: "smb_no_address",
 			interaction: &oobclient.Interaction{
 				Protocol:  "smb",
-				FullID:    "smb123",
+				FullId:    "smb123",
 				Timestamp: ts,
 			},
 			contains: []string{
@@ -69,7 +69,7 @@ func TestFormatStandard(t *testing.T) {
 			name: "responder_protocol",
 			interaction: &oobclient.Interaction{
 				Protocol:  "responder",
-				FullID:    "resp123",
+				FullId:    "resp123",
 				Timestamp: ts,
 			},
 			contains: []string{
@@ -81,7 +81,7 @@ func TestFormatStandard(t *testing.T) {
 			name: "verbose_with_request",
 			interaction: &oobclient.Interaction{
 				Protocol:      "http",
-				FullID:        "verbose123",
+				FullId:        "verbose123",
 				RemoteAddress: "10.0.0.1",
 				Timestamp:     ts,
 				RawRequest:    "GET / HTTP/1.1\nHost: test.com",
@@ -119,7 +119,7 @@ func TestFormatJSON(t *testing.T) {
 	interaction := &oobclient.Interaction{
 		Protocol:      "dns",
 		UniqueID:      "uniqueid123",
-		FullID:        "fullid123",
+		FullId:        "fullid123",
 		QType:         "A",
 		RawRequest:    "request data",
 		RawResponse:   "response data",
@@ -281,7 +281,7 @@ func TestShouldDisplay_WithPatterns(t *testing.T) {
 	t.Run("match_passes", func(t *testing.T) {
 		interaction := &oobclient.Interaction{
 			Protocol: "http",
-			FullID:   "ssrf-test-123",
+			FullId:   "ssrf-test-123",
 		}
 		assert.True(t, shouldDisplay(interaction, false, false, false, matchRegexes, filterRegexes))
 	})
@@ -289,7 +289,7 @@ func TestShouldDisplay_WithPatterns(t *testing.T) {
 	t.Run("match_fails", func(t *testing.T) {
 		interaction := &oobclient.Interaction{
 			Protocol: "http",
-			FullID:   "other-123",
+			FullId:   "other-123",
 		}
 		assert.False(t, shouldDisplay(interaction, false, false, false, matchRegexes, filterRegexes))
 	})
@@ -297,7 +297,7 @@ func TestShouldDisplay_WithPatterns(t *testing.T) {
 	t.Run("filter_excludes", func(t *testing.T) {
 		interaction := &oobclient.Interaction{
 			Protocol:   "http",
-			FullID:     "ssrf-test-123",
+			FullId:     "ssrf-test-123",
 			RawRequest: "health-check",
 		}
 		assert.False(t, shouldDisplay(interaction, false, false, false, matchRegexes, filterRegexes))
@@ -309,7 +309,7 @@ func TestVerboseSeparators(t *testing.T) {
 
 	interaction := &oobclient.Interaction{
 		Protocol:    "dns",
-		FullID:      "test123",
+		FullId:      "test123",
 		QType:       "A",
 		RawRequest:  "query data",
 		RawResponse: "response data",

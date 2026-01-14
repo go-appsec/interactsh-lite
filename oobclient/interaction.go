@@ -14,8 +14,8 @@ type Interaction struct {
 	// This matches the correlation-id + nonce from URL().
 	UniqueID string `json:"unique-id"`
 
-	// FullID is the complete identifier (e.g., full subdomain including any prefixes).
-	FullID string `json:"full-id"`
+	// FullId is the complete identifier (e.g., full subdomain including any prefixes).
+	FullId string `json:"full-id"`
 
 	// QType is the DNS query type, populated only when Protocol is "dns".
 	// Values: "A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA"

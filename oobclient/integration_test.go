@@ -90,7 +90,7 @@ func TestIntegration_DNSInteraction(t *testing.T) {
 		mu.Lock()
 		defer mu.Unlock()
 
-		if strings.Contains(i.FullID, strings.Split(payloadURL, ".")[0]) {
+		if strings.Contains(i.FullId, strings.Split(payloadURL, ".")[0]) {
 			interactions = append(interactions, i)
 			select {
 			case <-done:
@@ -152,7 +152,7 @@ func TestIntegration_HTTPInteraction(t *testing.T) {
 		mu.Lock()
 		defer mu.Unlock()
 
-		if strings.Contains(i.FullID, strings.Split(payloadURL, ".")[0]) && i.Protocol == "http" {
+		if strings.Contains(i.FullId, strings.Split(payloadURL, ".")[0]) && i.Protocol == "http" {
 			hasHTTP = true
 			select {
 			case <-done:

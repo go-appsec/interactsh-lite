@@ -34,7 +34,7 @@ json: true
 		assert.Equal(t, "secret-token", cfg.Token)
 		assert.Equal(t, 5, cfg.Number)
 		assert.Equal(t, 10, cfg.PollInterval)
-		assert.Equal(t, 15, cfg.CorrelationIDLength)
+		assert.Equal(t, 15, cfg.CorrelationIdLength)
 		assert.Equal(t, 2*time.Minute, cfg.KeepAliveInterval)
 		assert.True(t, cfg.DNSOnly)
 		assert.True(t, cfg.JSON)
@@ -55,8 +55,8 @@ number: 10
 		assert.Equal(t, 10, cfg.Number)
 		// Defaults preserved for unset values
 		assert.Equal(t, 5, cfg.PollInterval)
-		assert.Equal(t, 20, cfg.CorrelationIDLength)
-		assert.Equal(t, 13, cfg.CorrelationIDNonceLength)
+		assert.Equal(t, 20, cfg.CorrelationIdLength)
+		assert.Equal(t, 13, cfg.CorrelationIdNonceLength)
 		assert.Equal(t, time.Minute, cfg.KeepAliveInterval)
 	})
 
@@ -67,8 +67,8 @@ number: 10
 		assert.Equal(t, "oast.pro,oast.live,oast.site,oast.online,oast.fun,oast.me", cfg.Server)
 		assert.Equal(t, 1, cfg.Number)
 		assert.Equal(t, 5, cfg.PollInterval)
-		assert.Equal(t, 20, cfg.CorrelationIDLength)
-		assert.Equal(t, 13, cfg.CorrelationIDNonceLength)
+		assert.Equal(t, 20, cfg.CorrelationIdLength)
+		assert.Equal(t, 13, cfg.CorrelationIdNonceLength)
 		assert.Equal(t, time.Minute, cfg.KeepAliveInterval)
 	})
 

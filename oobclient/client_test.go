@@ -1075,7 +1075,7 @@ func TestDecryptInteraction(t *testing.T) {
 		interaction := Interaction{
 			Protocol:      "http",
 			UniqueID:      "test123",
-			FullID:        "test123.example.com",
+			FullId:        "test123.example.com",
 			RemoteAddress: "1.2.3.4",
 		}
 		plaintext, err := json.Marshal(interaction)
@@ -1209,7 +1209,7 @@ func TestPollingWithEncryptedData(t *testing.T) {
 				interaction := Interaction{
 					Protocol:      "http",
 					UniqueID:      "encrypted123",
-					FullID:        "encrypted123.example.com",
+					FullId:        "encrypted123.example.com",
 					RemoteAddress: "5.6.7.8",
 				}
 				plaintext, _ := json.Marshal(interaction)
