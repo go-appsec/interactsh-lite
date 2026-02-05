@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -64,9 +65,10 @@ func ParseCommaSeparated(input string) []string {
 }
 
 func DefaultConfigPath() string {
-	home, err := os.UserHomeDir()
+	// Use OS-specific config directory (XDG_CONFIG_HOME on Linux, %APPDATA% on Windows)
+	configDir, err := os.UserConfigDir()
 	if err != nil {
 		return ""
 	}
-	return home + "/.config/interactsh-client/config.yaml"
+	return filepath.Join(configDir, "interactsh-client", "config.yaml")
 }

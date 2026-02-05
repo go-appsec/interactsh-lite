@@ -322,14 +322,13 @@ func (c *Client) StartPolling(interval time.Duration, callback InteractionCallba
 		return ErrAlreadyPolling
 	case stateClosed:
 		return ErrClientClosed
+	default:
+		ctx, cancel := context.WithCancel(context.Background())
+		c.pollCancel = cancel
+		c.state = statePolling
+
+		go c.pollLoop(ctx, interval, callback)
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	c.pollCancel = cancel
-	c.state = statePolling
-
-	go c.pollLoop(ctx, interval, callback)
-
 	return nil
 }
 
@@ -475,14 +474,13 @@ func (c *Client) StopPolling() error {
 		return ErrClientClosed
 	case stateIdle:
 		return ErrNotPolling
+	default:
+		if c.pollCancel != nil {
+			c.pollCancel()
+			c.pollCancel = nil
+		}
+		c.state = stateIdle
 	}
-
-	if c.pollCancel != nil {
-		c.pollCancel()
-		c.pollCancel = nil
-	}
-	c.state = stateIdle
-
 	return nil
 }
 
