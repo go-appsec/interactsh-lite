@@ -3,11 +3,10 @@
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/go-appsec/interactsh-lite/blob/main/LICENSE)
 [![Build Status](https://github.com/go-appsec/interactsh-lite/actions/workflows/tests-main.yml/badge.svg)](https://github.com/go-appsec/interactsh-lite/actions/workflows/tests-main.yml)
 
-A lightweight, dependency-minimal Go client for [Interactsh](https://github.com/projectdiscovery/interactsh) servers. This library provides out-of-band (OOB / OAST) interaction detection for security testing with a clean, simple API.
+A lightweight, dependency-minimal Go module and standalone client for [Interactsh](https://github.com/projectdiscovery/interactsh) servers. This tool provides out-of-band (OOB / OAST) interaction detection for security testing with a clean, simple API.
 
 ## Features
 
-- Single package import (`oobclient`)
 - Minimal dependencies for minimal size
 - Context-aware API for cancellation and timeouts
 - Thread-safe client with clear state machine
@@ -25,6 +24,96 @@ The client can detect the following out-of-band interaction types:
 | HTTP/HTTPS | Full request and response capture |
 | SMTP/SMTPS | Email interactions with MAIL FROM capture |
 | LDAP | LDAP search query interactions |
+
+
+## CLI Tool
+
+Download the binary for your platform from the [latest release](https://github.com/go-appsec/interactsh-lite/releases), or by using `go install`:
+
+```bash
+go install github.com/go-appsec/interactsh-lite/cmd/interactshlite@latest
+```
+
+### CLI Usage
+
+The `interactshlite` command provides a standalone tool for OOB interaction detection, largely compatible with ProjectDiscovery's `interactsh-client`.
+
+#### Basic Usage
+
+```bash
+# Generate payload and poll for interactions
+interactshlite
+
+# Generate multiple payloads
+interactshlite -n 5
+
+# Use a specific server
+interactshlite -s oast.pro
+
+# JSON output for scripting
+interactshlite --json
+
+# Verbose output with full request/response data
+interactshlite -v
+```
+
+### CLI Flags
+
+| Flag | Description |
+|------|-------------|
+| `-s, --server` | Interactsh server(s) to use (comma-separated) |
+| `-n, --number` | Number of payloads to generate |
+| `-t, --token` | Authentication token for protected servers |
+| `--config` | Path to config file |
+| `--poll-interval, --pi` | Poll interval in seconds (default: 5) |
+| `--keep-alive-interval, --kai` | Keep-alive interval (default: 1m) |
+| `--session-file, --sf` | Session file for persistence across restarts |
+| `--dns-only` | Display only DNS interactions |
+| `--http-only` | Display only HTTP interactions |
+| `--smtp-only` | Display only SMTP interactions |
+| `-m, --match` | Regex pattern to include interactions |
+| `-f, --filter` | Regex pattern to exclude interactions |
+| `-o, --output` | Output file path |
+| `--json` | Output in JSON format |
+| `-v, --verbose` | Verbose output with request/response data |
+| `--payload-store, --ps` | Store generated payloads to file |
+| `--payload-store-file, --psf` | Payload store file path (default: interactsh_payload.txt) |
+| `--health-check, --hc` | Run diagnostic checks |
+| `--version` | Show version |
+
+### Configuration File
+
+Create `~/.config/interactsh-client/config.yaml`:
+
+```yaml
+server: "oast.fun,oast.me"
+token: ""
+poll-interval: 5
+keep-alive-interval: 1m
+json: false
+verbose: false
+```
+
+CLI flags override config file values.
+
+### CLI Examples
+
+```bash
+# Filter to show only DNS A record interactions
+interactshlite --dns-only -v
+
+# Match specific patterns in interactions
+interactshlite -m "ssrf.*" -m "xxe.*"
+
+# Save payloads to file for later use
+interactshlite -n 10 --payload-store --payload-store-file payloads.txt
+
+# Use session file to persist correlation ID
+interactshlite --session-file session.yaml
+
+# Run health check diagnostics
+interactshlite --health-check
+```
 
 ## Library
 
@@ -229,90 +318,3 @@ The `Interaction` struct fields are identical.
 | `ErrClientClosed` | Operation attempted on a closed client |
 | `ErrAlreadyPolling` | StartPolling called while already polling |
 | `ErrNotPolling` | StopPolling called while not polling |
-
-## CLI Tool
-
-```bash
-go install github.com/go-appsec/interactsh-lite/cmd/interactshlite@latest
-```
-
-### CLI Usage
-
-The `interactshlite` command provides a standalone tool for OOB interaction detection, compatible with the original `interactsh-client`.
-
-#### Basic Usage
-
-```bash
-# Generate payload and poll for interactions
-interactshlite
-
-# Generate multiple payloads
-interactshlite -n 5
-
-# Use a specific server
-interactshlite -s oast.pro
-
-# JSON output for scripting
-interactshlite --json
-
-# Verbose output with full request/response data
-interactshlite -v
-```
-
-### CLI Flags
-
-| Flag | Description |
-|------|-------------|
-| `-s, --server` | Interactsh server(s) to use (comma-separated) |
-| `-n, --number` | Number of payloads to generate |
-| `-t, --token` | Authentication token for protected servers |
-| `--config` | Path to config file |
-| `--poll-interval, --pi` | Poll interval in seconds (default: 5) |
-| `--keep-alive-interval, --kai` | Keep-alive interval (default: 1m) |
-| `--session-file, --sf` | Session file for persistence across restarts |
-| `--dns-only` | Display only DNS interactions |
-| `--http-only` | Display only HTTP interactions |
-| `--smtp-only` | Display only SMTP interactions |
-| `-m, --match` | Regex pattern to include interactions |
-| `-f, --filter` | Regex pattern to exclude interactions |
-| `-o, --output` | Output file path |
-| `--json` | Output in JSON format |
-| `-v, --verbose` | Verbose output with request/response data |
-| `--payload-store, --ps` | Store generated payloads to file |
-| `--payload-store-file, --psf` | Payload store file path (default: interactsh_payload.txt) |
-| `--health-check, --hc` | Run diagnostic checks |
-| `--version` | Show version |
-
-### Configuration File
-
-Create `~/.config/interactsh-client/config.yaml`:
-
-```yaml
-server: "oast.fun,oast.me"
-token: ""
-poll-interval: 5
-keep-alive-interval: 1m
-json: false
-verbose: false
-```
-
-CLI flags override config file values.
-
-### CLI Examples
-
-```bash
-# Filter to show only DNS A record interactions
-interactshlite --dns-only -v
-
-# Match specific patterns in interactions
-interactshlite -m "ssrf.*" -m "xxe.*"
-
-# Save payloads to file for later use
-interactshlite -n 10 --payload-store --payload-store-file payloads.txt
-
-# Use session file to persist correlation ID
-interactshlite --session-file session.yaml
-
-# Run health check diagnostics
-interactshlite --health-check
-```
