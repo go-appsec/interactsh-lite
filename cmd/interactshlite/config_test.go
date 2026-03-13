@@ -64,7 +64,7 @@ number: 10
 		cfg, err := LoadConfig("/nonexistent/path/config.yaml")
 		require.NoError(t, err)
 
-		assert.Equal(t, "oast.pro,oast.live,oast.site,oast.online,oast.fun,oast.me", cfg.Server)
+		assert.Equal(t, "oscar.oastsrv.net,alpha.oastsrv.net,sierra.oastsrv.net,tango.oastsrv.net", cfg.Server)
 		assert.Equal(t, 1, cfg.Number)
 		assert.Equal(t, 5, cfg.PollInterval)
 		assert.Equal(t, 20, cfg.CorrelationIdLength)
@@ -90,7 +90,7 @@ func TestParseCommaSeparated(t *testing.T) {
 		input    string
 		expected []string
 	}{
-		{"single_server", "oast.pro", []string{"oast.pro"}},
+		{"single_server", "alpha.oastsrv.net", []string{"alpha.oastsrv.net"}},
 		{"multiple_servers", "a.com,b.com,c.com", []string{"a.com", "b.com", "c.com"}},
 		{"with_spaces", " a.com , b.com ", []string{"a.com", "b.com"}},
 		{"empty_string", "", nil},

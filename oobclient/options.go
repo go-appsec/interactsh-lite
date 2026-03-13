@@ -11,8 +11,8 @@ const userAgent = "go-appsec/interactsh-lite-v0.1"
 // Options configures the client behavior.
 type Options struct {
 	// ServerURLs specifies interactsh servers to try.
-	// The list is shuffled and tried in random order until one succeeds.
-	// Default: public interactsh servers (oast.pro, oast.live, etc.)
+	// The list is tried starting at a random index, until one succeeds.
+	// Default: public go-appsec servers (oscar.oastsrv.net, alpha.oastsrv.net, sierra.oastsrv.net, tango.oastsrv.net)
 	ServerURLs []string
 
 	// Token is an optional authentication token for protected servers.
@@ -52,14 +52,18 @@ type Options struct {
 }
 
 // DefaultOptions provides sensible defaults for most use cases.
-// These defaults connect to public interactsh servers with standard timeouts.
+// These defaults connect to oastsrv.net interactsh servers with standard timeouts.
 var DefaultOptions = Options{
-	ServerURLs:               []string{"oast.pro", "oast.live", "oast.site", "oast.online", "oast.fun", "oast.me"},
+	ServerURLs:               []string{"oscar.oastsrv.net", "alpha.oastsrv.net", "sierra.oastsrv.net", "tango.oastsrv.net"},
 	HTTPTimeout:              10 * time.Second,
 	KeepAliveInterval:        60 * time.Second,
 	CorrelationIdLength:      20,
 	CorrelationIdNonceLength: 13,
 }
+
+// fallbackServerURLs are public interactsh servers tried when primary defaults all fail.
+// Only used when the caller did not explicitly provide ServerURLs.
+var fallbackServerURLs = []string{"oast.pro", "oast.live", "oast.site", "oast.online", "oast.fun", "oast.me"}
 
 // newSecureHTTPClient creates an HTTP client with secure defaults:
 // - Does NOT follow redirects (returns error on redirect)

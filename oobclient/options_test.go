@@ -15,7 +15,7 @@ func TestDefaultOptions(t *testing.T) {
 
 	t.Run("has_server_urls", func(t *testing.T) {
 		assert.NotEmpty(t, DefaultOptions.ServerURLs)
-		assert.Contains(t, DefaultOptions.ServerURLs, "oast.pro")
+		assert.Contains(t, DefaultOptions.ServerURLs, "alpha.oastsrv.net")
 	})
 
 	t.Run("http_timeout_set", func(t *testing.T) {

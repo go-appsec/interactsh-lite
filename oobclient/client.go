@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -83,6 +84,7 @@ type Client struct {
 // If opts is nil, DefaultOptions is used. The client will try servers from
 // opts.ServerURLs in random order until one successfully accepts the registration.
 // If HTTPS fails and DisableHTTPFallback is false, HTTP will be attempted as a fallback.
+// When using default servers, fallbackServerURLs are tried if all defaults fail.
 //
 // Returns an error if registration fails with all configured servers.
 // Use errors.Is() to check for specific error conditions like ErrUnauthorized.
@@ -93,7 +95,8 @@ func New(ctx context.Context, opts ...Options) (*Client, error) {
 	}
 
 	serverURLs := opt.ServerURLs
-	if len(serverURLs) == 0 {
+	userProvidedServers := len(serverURLs) > 0
+	if !userProvidedServers {
 		serverURLs = DefaultOptions.ServerURLs
 	}
 
@@ -158,7 +161,11 @@ func New(ctx context.Context, opts ...Options) (*Client, error) {
 	}
 
 	if err := client.tryRegisterServers(ctx, serverURLs); err != nil {
-		return nil, err
+		if userProvidedServers || len(fallbackServerURLs) == 0 {
+			return nil, err
+		} else if fallbackErr := client.tryRegisterServers(ctx, fallbackServerURLs); fallbackErr != nil {
+			return nil, errors.Join(err, fallbackErr)
+		}
 	}
 
 	if client.keepAliveInterval > 0 {
@@ -168,15 +175,37 @@ func New(ctx context.Context, opts ...Options) (*Client, error) {
 	return client, nil
 }
 
-// tryRegisterServers attempts registration with servers in random order.
+// tryRegisterServers attempts registration starting at a random index.
 func (c *Client) tryRegisterServers(ctx context.Context, serverURLs []string) error {
-	shuffled := slices.Clone(serverURLs)
-	shuffleStrings(shuffled)
+	n := len(serverURLs)
+	b := make([]byte, 1)
+	_, _ = rand.Read(b)
+	start := int(b[0]) % n
 
 	var errs []error
-	for _, server := range shuffled {
+	var failedIPs []string
+	for i := 0; i < n; i++ {
+		server := serverURLs[(start+i)%n]
+
+		// Skip if this server resolves to an already-failed IP
+		if len(failedIPs) > 0 {
+			ips, err := net.LookupHost(server)
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+			if slices.ContainsFunc(ips, func(ip string) bool {
+				return slices.Contains(failedIPs, ip)
+			}) {
+				continue
+			}
+		}
+
 		if err := c.tryRegisterServer(ctx, server); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", server, err))
+			if ips, lookupErr := net.LookupHost(server); lookupErr == nil {
+				failedIPs = append(failedIPs, ips...)
+			}
 			continue
 		}
 		return nil
@@ -293,7 +322,7 @@ func (c *Client) startKeepAlive() {
 }
 
 // Domain returns the base interaction domain (correlation-id + server host).
-// Static for the client's lifetime. Example: "ck9jfz4x6o1s3d8w2yzn.oast.pro"
+// Static for the client's lifetime. Example: "ck9jfz4x6o1s3d8w2yzn.alpha.oastsrv.net"
 //
 // Use directly for DNS lookups or as a base for URLs.
 // For unique URLs per test case, use URL() instead.
@@ -305,7 +334,7 @@ func (c *Client) Domain() string {
 // Each call generates a new URL with a different nonce, suitable for
 // correlating specific test cases with their interactions.
 //
-// Example: "cn4h7pjqdka31f8e5g6bry8djt4un3h1x.oast.pro"
+// Example: "cn4h7pjqdka31f8e5g6bry8djt4un3h1x.alpha.oastsrv.net"
 //
 // Returns a bare domain (no scheme). Prepend http:// or https:// as needed,
 // or use directly for DNS, SMTP, FTP, LDAP, etc.
@@ -782,15 +811,6 @@ func decodePublicKey(data string) (*rsa.PublicKey, error) {
 	}
 
 	return rsaPubKey, nil
-}
-
-func shuffleStrings(s []string) {
-	jBytes := make([]byte, 1)
-	for i := len(s) - 1; i > 0; i-- {
-		_, _ = rand.Read(jBytes)
-		j := int(jBytes[0]) % (i + 1)
-		s[i], s[j] = s[j], s[i]
-	}
 }
 
 // generateUUID4 generates a random UUID v4 string using crypto/rand.

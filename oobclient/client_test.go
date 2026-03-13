@@ -57,44 +57,72 @@ func TestGenerateUUID4(t *testing.T) {
 	})
 }
 
-func TestShuffleStrings(t *testing.T) {
+func TestTryRegisterServers(t *testing.T) {
 	t.Parallel()
 
-	t.Run("empty_slice", func(t *testing.T) {
-		var s []string
-		shuffleStrings(s)
-		assert.Empty(t, s)
+	t.Run("tries_all_servers", func(t *testing.T) {
+		var successCalled atomic.Bool
+		failServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		t.Cleanup(failServer.Close)
+
+		successServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			successCalled.Store(true)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"message":"registration successful"}`))
+		}))
+		t.Cleanup(successServer.Close)
+
+		client := &Client{
+			publicKeyB64:        "dGVzdA==",
+			disableHTTPFallback: true,
+			httpClient:          newSecureHTTPClient(time.Second),
+		}
+
+		// All fail servers plus one success — rotation ensures success is reached
+		servers := []string{failServer.URL, failServer.URL, failServer.URL, successServer.URL}
+		err := client.tryRegisterServers(t.Context(), servers)
+		require.NoError(t, err)
+		assert.True(t, successCalled.Load())
 	})
 
-	t.Run("single_element", func(t *testing.T) {
-		s := []string{"a"}
-		shuffleStrings(s)
-		assert.Equal(t, []string{"a"}, s)
-	})
+	t.Run("random_start_index", func(t *testing.T) {
+		var firstHit atomic.Int32 // 1 = server1, 2 = server2
 
-	t.Run("preserves_elements", func(t *testing.T) {
-		original := []string{"a", "b", "c", "d", "e"}
-		s := make([]string, len(original))
-		copy(s, original)
+		server1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			firstHit.CompareAndSwap(0, 1)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"message":"registration successful"}`))
+		}))
+		t.Cleanup(server1.Close)
 
-		shuffleStrings(s)
+		server2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			firstHit.CompareAndSwap(0, 2)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"message":"registration successful"}`))
+		}))
+		t.Cleanup(server2.Close)
 
-		assert.ElementsMatch(t, original, s)
-	})
+		hitServer1 := 0
+		for i := 0; i < 20; i++ {
+			firstHit.Store(0)
 
-	t.Run("changes_order", func(t *testing.T) {
-		original := []string{"a", "b", "c", "d", "e", "f", "g", "h"}
-		var unchanged int
-		for i := 0; i < 10; i++ {
-			s := make([]string, len(original))
-			copy(s, original)
-			shuffleStrings(s)
-			if strings.Join(s, "") == strings.Join(original, "") {
-				unchanged++
+			client := &Client{
+				publicKeyB64:        "dGVzdA==",
+				disableHTTPFallback: true,
+				httpClient:          newSecureHTTPClient(time.Second),
+			}
+
+			_ = client.tryRegisterServers(t.Context(), []string{server1.URL, server2.URL})
+			if firstHit.Load() == 1 {
+				hitServer1++
 			}
 		}
-		// Statistically unlikely to remain unchanged all 10 times
-		assert.Less(t, unchanged, 10)
+
+		// Should not always start at the same server
+		assert.Positive(t, hitServer1)
+		assert.Less(t, hitServer1, 20)
 	})
 }
 
@@ -712,6 +740,53 @@ func TestNew(t *testing.T) {
 		t.Cleanup(func() { _ = client.Close() })
 
 		assert.True(t, customClientCalled)
+	})
+
+	t.Run("falls_back_on_default_failure", func(t *testing.T) {
+		fallbackServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"message":"registration successful"}`))
+		}))
+		t.Cleanup(fallbackServer.Close)
+
+		origDefaults := DefaultOptions.ServerURLs
+		origFallback := fallbackServerURLs
+		t.Cleanup(func() {
+			DefaultOptions.ServerURLs = origDefaults
+			fallbackServerURLs = origFallback
+		})
+
+		DefaultOptions.ServerURLs = []string{"http://invalid.local:9999"}
+		fallbackServerURLs = []string{fallbackServer.URL}
+
+		client, err := New(t.Context(), Options{
+			HTTPTimeout:         100 * time.Millisecond,
+			DisableKeepAlive:    true,
+			DisableHTTPFallback: true,
+		})
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = client.Close() })
+	})
+
+	t.Run("no_fallback_with_user_servers", func(t *testing.T) {
+		fallbackServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"message":"registration successful"}`))
+		}))
+		t.Cleanup(fallbackServer.Close)
+
+		origFallback := fallbackServerURLs
+		t.Cleanup(func() { fallbackServerURLs = origFallback })
+		fallbackServerURLs = []string{fallbackServer.URL}
+
+		_, err := New(t.Context(), Options{
+			ServerURLs:          []string{"http://invalid.local:9999"},
+			HTTPTimeout:         100 * time.Millisecond,
+			DisableKeepAlive:    true,
+			DisableHTTPFallback: true,
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to register with any server")
 	})
 }
 

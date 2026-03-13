@@ -48,7 +48,7 @@ interactshlite
 interactshlite -n 5
 
 # Use a specific server
-interactshlite -s oast.pro
+interactshlite -s alpha.oastsrv.net
 
 # JSON output for scripting
 interactshlite --json
@@ -86,7 +86,7 @@ interactshlite -v
 Create `~/.config/interactsh-client/config.yaml`:
 
 ```yaml
-server: "oast.fun,oast.me"
+server: "oscar.oastsrv.net,alpha.oastsrv.net,sierra.oastsrv.net,tango.oastsrv.net"
 token: ""
 poll-interval: 5
 keep-alive-interval: 1m
@@ -221,13 +221,13 @@ if errors.Is(err, oobclient.ErrClientClosed) {
 ```go
 // Domain() returns the base domain (static for client lifetime)
 baseDomain := client.Domain()
-// Example: "cn4h7pjqdka31f8e5g6b.oast.pro" (20-char correlation ID)
+// Example: "cn4h7pjqdka31f8e5g6b.alpha.oastsrv.net" (20-char correlation ID)
 
 // URL() returns unique URLs for each test case
 url1 := client.URL()
 url2 := client.URL()
-// Example: "cn4h7pjqdka31f8e5g6bry8djt4un3h1x.oast.pro" (20 + 13 chars)
-// Example: "cn4h7pjqdka31f8e5g6bkne9wfg4a3mt1.oast.pro" (20 + 13 chars)
+// Example: "cn4h7pjqdka31f8e5g6bry8djt4un3h1x.alpha.oastsrv.net" (20 + 13 chars)
+// Example: "cn4h7pjqdka31f8e5g6bkne9wfg4a3mt1.alpha.oastsrv.net" (20 + 13 chars)
 ```
 
 ### Migration from ProjectDiscovery/Interactsh
@@ -254,7 +254,7 @@ This library is a mostly drop-in replacement for the [official Interactsh](https
 -c, err := client.New(opts)
 +ctx := context.Background()
 +c, err := oobclient.New(ctx, oobclient.Options{
-+    ServerURLs: []string{"oast.pro"},
++    ServerURLs: []string{"oscar.oastsrv.net", "alpha.oastsrv.net", "sierra.oastsrv.net", "tango.oastsrv.net"},
 +})
 ```
 
@@ -317,3 +317,7 @@ The `Interaction` struct fields are identical.
 | `ErrClientClosed` | Operation attempted on a closed client |
 | `ErrAlreadyPolling` | StartPolling called while already polling |
 | `ErrNotPolling` | StopPolling called while not polling |
+
+## Terms of Service
+
+Use of this tool and the hosted OAST service on `*.oastsrv.net` is subject to our [Terms of Service](TERMS-OF-SERVICE.md).
