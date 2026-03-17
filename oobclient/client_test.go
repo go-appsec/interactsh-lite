@@ -383,6 +383,69 @@ func TestClientDomain(t *testing.T) {
 	})
 }
 
+func TestEncodedResponse(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"message":"registration successful"}`))
+	}))
+	t.Cleanup(server.Close)
+
+	client, err := New(t.Context(), Options{
+		ServerURLs:       []string{server.URL},
+		DisableKeepAlive: true,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = client.Close() })
+
+	t.Run("all_params", func(t *testing.T) {
+		u := client.EncodedResponse(302, []string{"Location: https://example.com"}, "redirecting")
+		assert.Contains(t, u, "status=302")
+		assert.Contains(t, u, "header=Location")
+		assert.Contains(t, u, "body=redirecting")
+		assert.True(t, strings.HasPrefix(u, "https://"))
+	})
+
+	t.Run("status_only", func(t *testing.T) {
+		u := client.EncodedResponse(200, nil, "")
+		assert.Contains(t, u, "status=200")
+		assert.NotContains(t, u, "header=")
+		assert.NotContains(t, u, "body=")
+	})
+
+	t.Run("headers_only", func(t *testing.T) {
+		u := client.EncodedResponse(0, []string{"X-Custom: val"}, "")
+		assert.NotContains(t, u, "status=")
+		assert.Contains(t, u, "header=")
+		assert.NotContains(t, u, "body=")
+	})
+
+	t.Run("body_only", func(t *testing.T) {
+		u := client.EncodedResponse(0, nil, "hello")
+		assert.NotContains(t, u, "status=")
+		assert.NotContains(t, u, "header=")
+		assert.Contains(t, u, "body=hello")
+	})
+
+	t.Run("multiple_headers", func(t *testing.T) {
+		u := client.EncodedResponse(0, []string{"X-One: 1", "X-Two: 2"}, "")
+		assert.Equal(t, 2, strings.Count(u, "header="))
+	})
+
+	t.Run("no_params", func(t *testing.T) {
+		u := client.EncodedResponse(0, nil, "")
+		assert.True(t, strings.HasPrefix(u, "https://"))
+		assert.NotContains(t, u, "?")
+	})
+
+	t.Run("unique_per_call", func(t *testing.T) {
+		u1 := client.EncodedResponse(200, nil, "")
+		u2 := client.EncodedResponse(200, nil, "")
+		assert.NotEqual(t, u1, u2)
+	})
+}
+
 func TestSaveLoadSession(t *testing.T) {
 	t.Parallel()
 

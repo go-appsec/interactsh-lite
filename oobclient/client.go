@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -371,6 +372,28 @@ func (c *Client) CorrelationID() string {
 // ServerHost returns the host of the interactsh server this client is registered with.
 func (c *Client) ServerHost() string {
 	return c.serverURL.Host
+}
+
+// EncodedResponse returns an HTTP URL with dynamic response query parameters.
+// Requires the server to have dynamic responses enabled (-dynamic-resp).
+// Use statusCode 0 to omit it, nil headers to omit them, and "" body to omit it.
+func (c *Client) EncodedResponse(statusCode int, headers []string, body string) string {
+	params := url.Values{}
+	if statusCode != 0 {
+		params.Set("status", strconv.Itoa(statusCode))
+	}
+	for _, h := range headers {
+		params.Add("header", h)
+	}
+	if body != "" {
+		params.Set("body", body)
+	}
+
+	u := "https://" + c.Domain()
+	if encoded := params.Encode(); encoded != "" {
+		u += "?" + encoded
+	}
+	return u
 }
 
 // Deprecated: URL is deprecated, use Domain as a drop-in replacement.
