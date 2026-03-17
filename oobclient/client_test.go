@@ -256,7 +256,7 @@ func TestClientStateMachine(t *testing.T) {
 		require.ErrorIs(t, err, ErrAlreadyPolling)
 	})
 
-	t.Run("stop_without_start_returns_error", func(t *testing.T) {
+	t.Run("stop_without_start_safe", func(t *testing.T) {
 		server := newMockServer(t)
 
 		client, err := New(t.Context(), Options{
@@ -267,7 +267,7 @@ func TestClientStateMachine(t *testing.T) {
 		t.Cleanup(func() { _ = client.Close() })
 
 		err = client.StopPolling()
-		require.ErrorIs(t, err, ErrNotPolling)
+		require.NoError(t, err)
 	})
 
 	t.Run("close_stops_polling", func(t *testing.T) {
@@ -1230,7 +1230,7 @@ func TestConcurrentAccess(t *testing.T) {
 		close(stopErrors)
 
 		for err := range stopErrors {
-			assert.ErrorIs(t, err, ErrNotPolling)
+			assert.NoError(t, err)
 		}
 	})
 }

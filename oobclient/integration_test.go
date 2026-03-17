@@ -33,7 +33,7 @@ func verifyHTTPInteraction(t *testing.T, client *Client) {
 	var mu sync.Mutex
 	done := make(chan struct{})
 	nonce := strings.Split(domain, ".")[0]
-	err = client.StartPolling(500*time.Millisecond, func(i *Interaction) {
+	err = client.StartPolling(10*time.Millisecond, func(i *Interaction) {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -49,7 +49,7 @@ func verifyHTTPInteraction(t *testing.T, client *Client) {
 	require.NoError(t, err)
 	select {
 	case <-done:
-	case <-time.After(30 * time.Second):
+	case <-time.After(60 * time.Second):
 	}
 	assert.NoError(t, client.StopPolling())
 

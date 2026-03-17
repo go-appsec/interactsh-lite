@@ -20,7 +20,4 @@ var (
 	// ErrAlreadyPolling indicates StartPolling was called while already polling.
 	// Call StopPolling first before starting a new polling loop.
 	ErrAlreadyPolling = errors.New("polling already started")
-
-	// ErrNotPolling indicates StopPolling was called while not polling.
-	ErrNotPolling = errors.New("polling not started")
 )

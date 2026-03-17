@@ -571,7 +571,7 @@ func (c *Client) StopPolling() error {
 	case stateClosed:
 		return ErrClientClosed
 	case stateIdle:
-		return ErrNotPolling
+		return nil
 	default:
 		if c.pollCancel != nil {
 			c.pollCancel()
