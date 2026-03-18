@@ -806,7 +806,7 @@ func TestNew(t *testing.T) {
 			DisableKeepAlive:    true,
 		})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "CorrelationIdLength must be 12 when using default servers")
+		assert.Contains(t, err.Error(), "CorrelationIdLength must be 16 when using default servers")
 	})
 
 	t.Run("rejects_short_nonce_length", func(t *testing.T) {

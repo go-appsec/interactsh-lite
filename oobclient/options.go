@@ -68,7 +68,7 @@ var DefaultOptions = Options{
 var fallbackServerURLs = []string{"oast.pro", "oast.live", "oast.site", "oast.online", "oast.fun", "oast.me"}
 
 // defaultServerCorrelationIdLength is the CorrelationIdLength used by the default go-appsec servers.
-const defaultServerCorrelationIdLength = 12
+const defaultServerCorrelationIdLength = 16
 
 // fallbackCorrelationIdLength is the minimum CorrelationIdLength required by
 // fallback servers (public oast.* servers use the interactsh default cidl=20).
