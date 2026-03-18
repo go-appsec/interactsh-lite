@@ -66,8 +66,9 @@ func TestIntegration_SessionPersistence(t *testing.T) {
 
 	// Create client and save session
 	client1, err := New(t.Context(), Options{
-		ServerURLs:       DefaultOptions.ServerURLs[:2],
-		DisableKeepAlive: true,
+		ServerURLs:          DefaultOptions.ServerURLs[:2],
+		DisableKeepAlive:    true,
+		CorrelationIdLength: defaultServerCorrelationIdLength,
 	})
 	require.NoError(t, err)
 	sessionPath := filepath.Join(t.TempDir(), "session.yaml")
@@ -105,8 +106,9 @@ func TestIntegration_FullLifecyclePerServer(t *testing.T) {
 			t.Parallel()
 
 			client, err := New(t.Context(), Options{
-				ServerURLs:       []string{server},
-				DisableKeepAlive: true,
+				ServerURLs:          []string{server},
+				DisableKeepAlive:    true,
+				CorrelationIdLength: defaultServerCorrelationIdLength,
 			})
 			require.NoError(t, err)
 			t.Cleanup(func() { _ = client.Close() })
