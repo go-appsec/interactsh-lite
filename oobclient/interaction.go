@@ -36,8 +36,4 @@ type Interaction struct {
 
 	// Timestamp is when the interaction was captured by the server.
 	Timestamp time.Time `json:"timestamp"`
-
-	// AsnInfo contains optional ASN enrichment data for the remote address,
-	// including geographic and organizational info (asn, country, org, IP range).
-	AsnInfo []map[string]string `json:"asninfo,omitempty"`
 }

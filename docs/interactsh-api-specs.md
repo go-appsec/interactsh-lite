@@ -184,7 +184,7 @@ Returns HTTP 401 status with an empty body. Occurs when the server requires auth
 **Validation:**
 - Response must contain `"message": "registration successful"` exactly
 - Any other message value is an error
-- Attempting to register a correlation ID that already exists returns 400
+- Attempting to register a correlation ID that already exists returns 400 with `"error": "correlation-id provided already exists"`
 
 ### Endpoint: GET /poll
 
@@ -222,7 +222,9 @@ Authorization: <token>  (optional, if server requires auth)
 | `tlddata` | `[]string` | No | Plaintext interactions sent to the root domain itself (only when wildcard/root-TLD mode is enabled on the server) |
 
 **Notes:**
-- `data` and `aes_key` are always present; `extra` and `tlddata` may be empty or absent
+- When empty, `data`, `extra`, and `tlddata` serialize as JSON `null` (nil slice), not `[]` — clients must handle both
+- `aes_key` is omitted (empty string) when `data` is empty; clients must not depend on it being present when there are no interactions
+- `extra` and `tlddata` may be absent
 - `extra` contains unencrypted interactions from services that store data under the auth token rather than a correlation ID (FTP hooks, SMB, Responder, LDAP full-logging mode)
 - `tlddata` contains interactions directed at the base domain (e.g., `alpha.oastsrv.net`) rather than a correlation-ID subdomain; these use per-consumer read offsets so each polling client receives only unseen interactions
 
@@ -275,6 +277,9 @@ Content-Length: <length>
 **Error Response (401 Unauthorized):**
 
 Returns HTTP 401 status with an empty body.
+
+**Special Error Detection:**
+- Deregistering a session that has been evicted or does not exist returns 400 with a error containing `"could not get correlation-id"`
 
 ### Endpoint: GET /metrics
 
@@ -340,7 +345,7 @@ All HTTP requests that do not match the API endpoints (`/register`, `/poll`, `/d
 | `/` (root) | text/html | Server banner page (customizable) |
 | all other | text/html | `<html><head></head><body><reflection></body></html>` |
 
-The `<reflection>` value is the reversed nonce portion of the payload URL extracted from the Host header. This allows clients to verify that the server actually received and processed the request.
+The `<reflection>` value is the character-reversed full subdomain label (the `correlationID+nonce` portion) extracted from the Host header. This allows clients to verify that the server actually received and processed the request.
 
 **Dynamic Response Parameters (when enabled on the server):**
 
@@ -435,15 +440,6 @@ The decrypted interaction JSON has this structure:
     "smtp-from": "<MAIL FROM address, if protocol=smtp>",
     "remote-address": "<IP address or IP:port>",
     "timestamp": "<RFC3339 timestamp>",
-    "asninfo": [
-        {
-            "first-ip": "<first IP in range>",
-            "last-ip": "<last IP in range>",
-            "asn": "AS<number>",
-            "country": "<country code>",
-            "org": "<organization name>"
-        }
-    ]
 }
 ```
 
