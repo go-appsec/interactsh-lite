@@ -39,7 +39,6 @@ The interactsh protocol enables out-of-band (OOB) interaction detection:
 | `RSAKeySize` | `2048` | RSA key size in bits |
 | `AESKeySize` | `32` | AES-256 key size in bytes (random bytes, not ASCII) |
 | `HTTPTimeout` | `10s` | Default HTTP request timeout |
-| `DefaultPollInterval` | `5s` | Default polling interval |
 | `DefaultKeepAliveInterval` | `60s` | Default keep-alive re-registration interval |
 
 ### Default Server URLs
@@ -48,12 +47,6 @@ Comma-separated list of public interactsh servers:
 ```
 oscar.oastsrv.net,alpha.oastsrv.net,sierra.oastsrv.net,tango.oastsrv.net
 ```
-
-### Environment Variables
-
-| Variable | Effect |
-|----------|--------|
-| `INTERACTSH_TLS_VERIFY=true` | Enforce TLS certificate verification; reject HTTP URLs |
 
 ---
 
@@ -103,6 +96,8 @@ Each interaction in the `data` array is AES encrypted. Decrypt as follows:
 3. Extract ciphertext: remaining bytes after IV
 4. Decrypt using AES-256-CTR mode
 5. Trim trailing whitespace (`\t`, `\r`, `\n`, space) from the plaintext before JSON parsing
+
+**No padding is applied.** AES-256-CTR is a stream cipher — the ciphertext is exactly the same length as the plaintext. The server encrypts JSON-marshaled interaction bytes directly without padding. The trailing whitespace trim in step 5 is defensive: older server versions (pre-v1.3.0) used `json.NewEncoder().Encode()` which appends a `\n` to the JSON output. Current servers use `json.Marshal()` which produces no trailing whitespace. Clients should still trim for compatibility with older servers.
 
 **Pseudocode:**
 ```
@@ -159,7 +154,7 @@ Content-Length: <length>
 {
     "public-key": "<base64-encoded PEM public key>",
     "secret-key": "<UUID v4 string>",
-    "correlation-id": "<alphanumeric string of CorrelationIdLength characters>"
+    "correlation-id": "<base32 string of CorrelationIdLength characters (xid alphabet: 0-9a-v)>"
 }
 ```
 
@@ -181,10 +176,14 @@ Content-Length: <length>
 
 Returns HTTP 401 status with an empty body. Occurs when the server requires authentication and the `Authorization` header is missing or does not match the server token.
 
+**Malformed request handling:** If the request body is not valid JSON or cannot be decoded, the server returns HTTP 400 with `{"error": "could not decode json body: <decode error>"}`. Missing required fields (empty `public-key`, `secret-key`, or `correlation-id`) cause field-specific processing errors (e.g., RSA key parse failure for an empty `public-key`), also returned as HTTP 400 with a JSON error object.
+
 **Validation:**
 - Response must contain `"message": "registration successful"` exactly
 - Any other message value is an error
-- Attempting to register a correlation ID that already exists returns 400 with `"error": "correlation-id provided already exists"`
+- Attempting to register a correlation ID that already exists is handled by secret key check:
+  - If the provided `secret-key` **matches** the existing session: returns 200 `{"message": "registration successful"}` without modifying the session (keep-alive path)
+  - If the provided `secret-key` **does not match**: returns 400 with `"error": "correlation-id provided already exists"`
 
 ### Endpoint: GET /poll
 
@@ -217,16 +216,17 @@ Authorization: <token>  (optional, if server requires auth)
 | Field | Type | Encrypted | Description |
 |-------|------|-----------|-------------|
 | `data` | `[]string` | Yes | AES-encrypted interaction JSON strings |
-| `aes_key` | `string` | RSA-OAEP | Base64-encoded encrypted AES key |
-| `extra` | `[]string` | No | Plaintext interaction JSON from token-authenticated services (FTP, SMB, Responder, LDAP with full logging) |
-| `tlddata` | `[]string` | No | Plaintext interactions sent to the root domain itself (only when wildcard/root-TLD mode is enabled on the server) |
+| `aes_key` | `string` | RSA-OAEP | Base64-encoded encrypted AES key; empty string when `data` is empty |
+| `extra` | `[]string` | No | Plaintext interactions from token-scoped services (FTP, SMB, Responder, LDAP full logging) |
+| `tlddata` | `[]string` | No | Plaintext interactions sent to the root domain (wildcard mode only) |
 
 **Notes:**
-- When empty, `data`, `extra`, and `tlddata` serialize as JSON `null` (nil slice), not `[]` — clients must handle both
-- `aes_key` is omitted (empty string) when `data` is empty; clients must not depend on it being present when there are no interactions
-- `extra` and `tlddata` may be absent
-- `extra` contains unencrypted interactions from services that store data under the auth token rather than a correlation ID (FTP hooks, SMB, Responder, LDAP full-logging mode)
-- `tlddata` contains interactions directed at the base domain (e.g., `alpha.oastsrv.net`) rather than a correlation-ID subdomain; these use per-consumer read offsets so each polling client receives only unseen interactions
+- **`data` uses destructive reads** — all accumulated per-client interactions are returned and then deleted from server storage. A subsequent poll with no new interactions returns empty `data`. Interactions are returned in capture order (FIFO, oldest first)
+- **`extra` and `tlddata` use per-consumer read offsets** keyed by the polling client's correlation ID — data is retained on the server and each client independently tracks its read position, receiving only new interactions since its last poll
+- When empty, `data` and `extra` serialize as JSON `null` (nil slice), not `[]` — clients must handle both
+- `tlddata` key is omitted from the JSON object entirely when empty (no root-domain interactions, `omitempty` tag)
+- `extra` is always present in the JSON (no `omitempty`)
+- `aes_key` contains the RSA-encrypted AES key when `data` is non-empty; empty string when `data` is empty. This is safe because clients iterate `data` before attempting AES key decryption
 
 **Error Response (400 Bad Request):**
 ```json
@@ -240,7 +240,8 @@ Authorization: <token>  (optional, if server requires auth)
 Returns HTTP 401 status with an empty body.
 
 **Special Error Detection:**
-- If response body contains `"could not get correlation-id from cache"`, the session has been evicted
+- If response body contains `"could not get correlation-id"`, the session has been evicted
+- If the `secret` parameter does not match the registered session's secret key, the server returns HTTP 400 with `"error": "invalid secret key passed for user"`
 
 ### Endpoint: POST /deregister
 
@@ -279,7 +280,8 @@ Content-Length: <length>
 Returns HTTP 401 status with an empty body.
 
 **Special Error Detection:**
-- Deregistering a session that has been evicted or does not exist returns 400 with a error containing `"could not get correlation-id"`
+- Deregistering a session that has been evicted or does not exist returns 400 with an error containing `"could not get correlation-id"`
+- If the `secret-key` does not match the registered session, the server returns HTTP 400 with `"error": "invalid secret key passed for user"`
 
 ### Endpoint: GET /metrics
 
@@ -302,6 +304,7 @@ Authorization: <token>  (optional, if server requires auth)
     "smb": 0,
     "smtp": 0,
     "sessions": 0,
+    "sessions_total": 0,
     "cache": { "hit-count": 0, "miss-count": 0, "load-success-count": 0, "load-error-count": 0, "total-load-time": 0, "eviction-count": 0 },
     "memory": { "alloc": "1.2 MB", ... },
     "cpu": { "user": 0, "system": 0, "idle": 0, "nice": 0, "total": 0 },
@@ -328,7 +331,7 @@ All endpoints respond to `OPTIONS` preflight requests with HTTP 204 (No Content)
 | `Server` | Always | Server domain (or custom value) |
 | `X-Interactsh-Version` | Unless disabled | Server version string |
 | `Content-Type` | JSON responses | `application/json; charset=utf-8` |
-| `X-Content-Type-Options` | JSON responses | `nosniff` |
+| `X-Content-Type-Options` | API JSON responses only | `nosniff` |
 
 ### Default Handler (Non-API Requests)
 
@@ -345,7 +348,7 @@ All HTTP requests that do not match the API endpoints (`/register`, `/poll`, `/d
 | `/` (root) | text/html | Server banner page (customizable) |
 | all other | text/html | `<html><head></head><body><reflection></body></html>` |
 
-The `<reflection>` value is the character-reversed full subdomain label (the `correlationID+nonce` portion) extracted from the Host header. This allows clients to verify that the server actually received and processed the request.
+The `<reflection>` value is the character-reversed full matched label — the entire `correlationID+nonce` string extracted from the Host header using the server's correlation ID matching logic. If no valid label is found, the reflection value is an empty string. This allows clients to verify that the server actually received and processed the request.
 
 **Dynamic Response Parameters (when enabled on the server):**
 
@@ -377,11 +380,13 @@ Generate a unique correlation ID at client creation:
 
 ### Secret Key Generation
 
-Generate a UUID v4 string:
+The client generates a UUID v4 string as the secret key:
 ```
 Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
 Example: 550e8400-e29b-41d4-a716-446655440000
 ```
+
+The server accepts any non-empty string as a secret key and performs no UUID format validation. The secret key is stored opaquely and compared by exact string equality.
 
 ### Domain Generation
 
@@ -432,16 +437,49 @@ The decrypted interaction JSON has this structure:
 ```json
 {
     "protocol": "http|https|dns|smtp|ftp|ldap|smb|responder",
-    "unique-id": "<the unique portion of the subdomain>",
-    "full-id": "<full subdomain or identifier>",
+    "unique-id": "<correlation ID portion only>",
+    "full-id": "<full subdomain prefix before server domain>",
     "q-type": "<DNS query type, if protocol=dns>",
     "raw-request": "<raw request data>",
     "raw-response": "<raw response data, if any>",
     "smtp-from": "<MAIL FROM address, if protocol=smtp>",
     "remote-address": "<IP address or IP:port>",
-    "timestamp": "<RFC3339 timestamp>",
+    "timestamp": "<RFC3339 timestamp in UTC>"
 }
 ```
+
+**`unique-id` vs `full-id`:**
+
+- `unique-id` — the correlation ID portion only; the first `CorrelationIdLength` characters of the matched subdomain label. For a default-length ID this is exactly 20 characters.
+- `full-id` — everything before the server's domain suffix (the `subdomainOf` result). For a typical payload URL `<correlationID><nonce>.<server-host>`, this is the full `correlationID+nonce` label (`TotalIdLength` characters). If the payload has additional subdomain labels (e.g., `nonce.corrID.<server-host>`), `full-id` includes all of them dot-separated. For root TLD interactions (wildcard mode), both fields are set to the full queried domain string.
+
+**Omitempty fields:** `q-type`, `raw-request`, `raw-response`, and `smtp-from` are omitted from the JSON when empty. `protocol`, `unique-id`, `full-id`, `remote-address`, and `timestamp` are always present.
+
+**Timestamp timezone:** All timestamps are generated via `time.Now()` and serialized as RFC3339 in UTC (e.g., `2024-01-15T10:30:00Z`).
+
+**Per-protocol field population:**
+
+| Field | http/https | dns | smtp | ftp | ldap | smb | responder |
+|-------|-----------|-----|------|-----|------|-----|-----------|
+| `unique-id` | correlation ID | correlation ID | correlation ID | — | correlation ID | — | — |
+| `full-id` | subdomain prefix | subdomain prefix | recipient domain prefix | — | BaseDN prefix | — | — |
+| `q-type` | — | query type (A, AAAA, TXT, …) | — | — | — | — | — |
+| `raw-request` | full HTTP request dump | DNS message string | full email body | command + params | operation details | log entry | log entry |
+| `raw-response` | full HTTP response dump | DNS response message string | — | — | — | — | — |
+| `smtp-from` | — | — | MAIL FROM address | — | — | — | — |
+| `remote-address` | IP:port | IP | IP | IP:port | IP | — | — |
+
+FTP, SMB, and Responder interactions are stored under the server auth token rather than a correlation ID; `unique-id` and `full-id` are empty for these protocols. They appear in the `extra` field of poll responses.
+
+**`remote-address` format:** For HTTP, the IP:port is extracted from the TCP connection's remote address via `net.SplitHostPort` (IP portion only) unless `--origin-ip-header` is set, in which case the header value is used as-is. For DNS, `net.SplitHostPort` is applied to the writer's `RemoteAddr()` (IP only, no port). For SMTP, `net.SplitHostPort` on the connection's remote address (IP only). For FTP, `ctx.Sess.RemoteAddr().String()` is used directly (IP:port).
+
+**HTTP raw-request / raw-response format:** Produced by `httputil.DumpRequest(req, true)` and `httputil.DumpResponse(resp, true)` respectively — standard Go text format with HTTP method/status line, headers, blank line, and body.
+
+**DNS raw-request / raw-response format:** The string representation produced by the `miekg/dns` library's `.String()` method — a human-readable multi-line text dump of the DNS message including all sections (question, answer, authority, additional). Not raw wire bytes.
+
+**LDAP raw-request format:** A multi-line text block with `Type=<operation>` and operation-specific fields. For Search operations this includes `BaseDn`, `Filter`, `FilterString`, and `Attributes` fields. For other operations it includes the relevant entity or attribute information.
+
+**SMTP raw-request:** The complete email data (body and headers as received from the DATA command). The `smtp-from` field carries the MAIL FROM address separately.
 
 ### Protocol Values
 
@@ -524,7 +562,7 @@ For the client, generate `CorrelationIdNonceLength` random bytes, encode with zb
 10. Parsed interaction:
     {
       "protocol": "http",
-      "unique-id": "ck9jfz4x6o1s3d8w2yznabcdefghijklm",
+      "unique-id": "ck9jfz4x6o1s3d8w2yzn",
       "full-id": "ck9jfz4x6o1s3d8w2yznabcdefghijklm",
       "remote-address": "203.0.113.42",
       "timestamp": "2024-01-15T10:30:00Z",
