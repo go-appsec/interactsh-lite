@@ -478,7 +478,7 @@ func (c *Client) pollInteractions(ctx context.Context, callback InteractionCallb
 	}
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		if bytes.Contains(body, []byte("correlation-id not found")) {
+		if bytes.Contains(body, []byte("could not get correlation-id")) {
 			return ErrSessionEvicted
 		}
 		return fmt.Errorf("poll failed with status %d: %s", resp.StatusCode, string(body))

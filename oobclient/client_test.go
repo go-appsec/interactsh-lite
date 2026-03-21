@@ -996,8 +996,8 @@ func TestPolling(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write([]byte(`{"message":"registration successful"}`))
 			case strings.HasSuffix(r.URL.Path, "/poll"):
-				w.WriteHeader(http.StatusNotFound)
-				_, _ = w.Write([]byte(`{"message":"correlation-id not found"}`))
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(`{"error":"could not get correlation-id"}`))
 			case strings.HasSuffix(r.URL.Path, "/deregister"):
 				w.WriteHeader(http.StatusOK)
 			}
