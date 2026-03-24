@@ -12,7 +12,7 @@ A lightweight, dependency-minimal Go module and standalone client for [Interacts
 - Thread-safe client with clear state machine
 - Session persistence for long-running tests
 - Compatible with public Interactsh servers and self-hosted instances
-- Standalone CLI tool (`interactshlite`)
+- Standalone CLI tool (`interactsh-lite`)
 
 ## Supported Protocols
 
@@ -31,30 +31,30 @@ The client can detect the following out-of-band interaction types:
 Download the binary for your platform from the [latest release](https://github.com/go-appsec/interactsh-lite/releases), or by using `go install`:
 
 ```bash
-go install github.com/go-appsec/interactsh-lite/cmd/interactshlite@latest
+go install github.com/go-appsec/interactsh-lite@latest
 ```
 
 ### CLI Usage
 
-The `interactshlite` command provides a standalone tool for OOB interaction detection, largely compatible with ProjectDiscovery's `interactsh-client`.
+The `interactsh-lite` command provides a standalone tool for OOB interaction detection, largely compatible with ProjectDiscovery's `interactsh-client`.
 
 #### Basic Usage
 
 ```bash
 # Generate payload and poll for interactions
-interactshlite
+interactsh-lite
 
 # Generate multiple payloads
-interactshlite -n 5
+interactsh-lite -n 5
 
 # Use a specific server
-interactshlite -s alpha.oastsrv.net
+interactsh-lite -s alpha.oastsrv.net
 
 # JSON output for scripting
-interactshlite --json
+interactsh-lite --json
 
 # Verbose output with full request/response data
-interactshlite -v
+interactsh-lite -v
 ```
 
 ### CLI Flags
@@ -100,19 +100,19 @@ CLI flags override config file values.
 
 ```bash
 # Filter to show only DNS A record interactions
-interactshlite --dns-only -v
+interactsh-lite --dns-only -v
 
 # Match specific patterns in interactions
-interactshlite -m "ssrf.*" -m "xxe.*"
+interactsh-lite -m "ssrf.*" -m "xxe.*"
 
 # Save payloads to file for later use
-interactshlite -n 10 --payload-store --payload-store-file payloads.txt
+interactsh-lite -n 10 --payload-store --payload-store-file payloads.txt
 
 # Use session file to persist correlation ID
-interactshlite --session-file session.yaml
+interactsh-lite --session-file session.yaml
 
 # Run health check diagnostics
-interactshlite --health-check
+interactsh-lite --health-check
 ```
 
 ## Library

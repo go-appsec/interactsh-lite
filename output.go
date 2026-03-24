@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -75,6 +77,34 @@ func formatJSON(w io.Writer, i *oobclient.Interaction) error {
 	}
 	_, err = fmt.Fprintln(w, string(data))
 	return err
+}
+
+// expandPatterns expands pattern values that may be files or comma-separated patterns.
+func expandPatterns(values []string) ([]string, error) {
+	var result []string
+	for _, v := range values {
+		if info, err := os.Stat(v); err == nil && !info.IsDir() {
+			f, err := os.Open(v)
+			if err != nil {
+				return nil, err
+			}
+			scanner := bufio.NewScanner(f)
+			for scanner.Scan() {
+				line := strings.TrimSpace(scanner.Text())
+				if line != "" && !strings.HasPrefix(line, "#") {
+					result = append(result, line)
+				}
+			}
+			if err := scanner.Err(); err != nil {
+				_ = f.Close()
+				return nil, err
+			}
+			_ = f.Close()
+		} else {
+			result = append(result, ParseCommaSeparated(v)...)
+		}
+	}
+	return result, nil
 }
 
 func compilePatterns(patterns []string, kind string) ([]*regexp.Regexp, error) {

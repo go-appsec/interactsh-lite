@@ -2,28 +2,23 @@ export GO111MODULE = on
 
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS = -ldflags "-s -w -X main.version=$(VERSION)"
-CMDS = $(notdir $(wildcard cmd/*))
 PLATFORMS ?= linux-amd64 linux-arm64 darwin-amd64 darwin-arm64 windows-amd64 windows-arm64
 
-.PHONY: build build-cross test test-all test-cover lint clean $(CMDS)
+.PHONY: build build-cross test test-all test-cover lint clean
 
-build: $(CMDS)
-
-$(CMDS):
+build:
 	@mkdir -p bin
-	go build $(LDFLAGS) -o bin/$@ ./cmd/$@
+	go build $(LDFLAGS) -o bin/interactsh-lite .
 
 build-cross:
 	@mkdir -p bin
 	@for platform in $(PLATFORMS); do \
 		os=$$(echo $$platform | cut -d'-' -f1); \
 		arch=$$(echo $$platform | cut -d'-' -f2); \
-		for cmd in $(CMDS); do \
-			ext=""; \
-			if [ "$$os" = "windows" ]; then ext=".exe"; fi; \
-			echo "Building $$cmd for $$os/$$arch..."; \
-			GOOS=$$os GOARCH=$$arch go build $(LDFLAGS) -o bin/$$cmd-$$platform$$ext ./cmd/$$cmd; \
-		done; \
+		ext=""; \
+		if [ "$$os" = "windows" ]; then ext=".exe"; fi; \
+		echo "Building interactsh-lite for $$os/$$arch..."; \
+		GOOS=$$os GOARCH=$$arch go build $(LDFLAGS) -o bin/interactsh-lite-$$platform$$ext .; \
 	done
 
 test:
