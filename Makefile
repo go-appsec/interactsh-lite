@@ -1,7 +1,7 @@
 export GO111MODULE = on
 
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-LDFLAGS = -ldflags "-s -w -X main.version=$(VERSION)"
+LDFLAGS = -ldflags "-s -w -X github.com/go-appsec/interactsh-lite/oobclient.Version=$(VERSION)"
 PLATFORMS ?= linux-amd64 linux-arm64 darwin-amd64 darwin-arm64 windows-amd64 windows-arm64
 
 .PHONY: build build-cross test test-all test-cover lint clean

@@ -3,10 +3,19 @@ package oobclient
 import (
 	"net"
 	"net/http"
+	"runtime/debug"
 	"time"
 )
 
-const userAgent = "go-appsec/interactsh-lite-v0.1"
+var Version = "dev"
+
+func init() {
+	if Version != "dev" {
+		return
+	} else if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		Version = info.Main.Version
+	}
+}
 
 // Options configures the client behavior.
 type Options struct {
@@ -90,7 +99,7 @@ func newSecureHTTPClient(timeout time.Duration) *http.Client {
 				MaxIdleConns:          10,
 				MaxIdleConnsPerHost:   2,
 			},
-			userAgent: userAgent,
+			userAgent: "Mozilla/5.0 (compatible; go-appsec/interactsh-lite@" + Version + ")",
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse // Do not follow redirects

@@ -66,7 +66,7 @@ func TestNewSecureHTTPClient(t *testing.T) {
 		client := newSecureHTTPClient(10 * time.Second)
 		uaTransport, ok := client.Transport.(*userAgentTransport)
 		require.True(t, ok)
-		assert.Equal(t, userAgent, uaTransport.userAgent)
+		assert.Equal(t, "Mozilla/5.0 (compatible; go-appsec/interactsh-lite@"+Version+")", uaTransport.userAgent)
 
 		transport, ok := uaTransport.base.(*http.Transport)
 		require.True(t, ok)
@@ -86,6 +86,6 @@ func TestNewSecureHTTPClient(t *testing.T) {
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = resp.Body.Close() })
 
-		assert.Equal(t, userAgent, receivedUA)
+		assert.Equal(t, "Mozilla/5.0 (compatible; go-appsec/interactsh-lite@"+Version+")", receivedUA)
 	})
 }

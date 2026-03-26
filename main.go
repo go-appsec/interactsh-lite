@@ -9,7 +9,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
-	"runtime/debug"
 	"syscall"
 	"time"
 
@@ -17,16 +16,6 @@ import (
 
 	"github.com/go-appsec/interactsh-lite/oobclient"
 )
-
-var version = "dev"
-
-func init() {
-	if version != "dev" {
-		return
-	} else if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
-		version = info.Main.Version
-	}
-}
 
 func main() {
 	var (
@@ -91,10 +80,8 @@ func main() {
 
 	pflag.Parse()
 
-	versionStr := version
-
 	if showVersion {
-		fmt.Printf("interactsh-lite version %s\n", versionStr)
+		fmt.Printf("interactsh-lite version %s\n", oobclient.Version)
 		os.Exit(0)
 	}
 
@@ -104,7 +91,7 @@ func main() {
 	}
 
 	if healthCheck {
-		runHealthCheck(os.Stdout, versionStr, configPath)
+		runHealthCheck(os.Stdout, oobclient.Version, configPath)
 		os.Exit(0)
 	}
 
