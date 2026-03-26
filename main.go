@@ -283,7 +283,6 @@ func main() {
 	}
 
 	_ = client.Close()
-	// exit normally
 }
 
 const dialTimeout = 5 * time.Second

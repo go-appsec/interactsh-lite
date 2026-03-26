@@ -19,10 +19,7 @@ type Options struct {
 	// Leave empty for public servers that don't require authentication.
 	Token string
 
-	// HTTPClient is an optional custom HTTP client.
-	// If provided, HTTPTimeout is ignored.
-	// The client should be configured to NOT follow redirects for security.
-	// Default: secure client with timeouts and no redirect following.
+	// HTTPClient is an optional custom HTTP client. If provided, HTTPTimeout is ignored.
 	HTTPClient *http.Client
 
 	// HTTPTimeout is the timeout for HTTP requests when using the default client.
@@ -53,8 +50,7 @@ type Options struct {
 	CorrelationIdNonceLength int
 }
 
-// DefaultOptions provides sensible defaults for most use cases.
-// These defaults connect to oastsrv.net interactsh servers with standard timeouts.
+// DefaultOptions provides defaults connecting to oastsrv.net servers.
 var DefaultOptions = Options{
 	ServerURLs:               []string{"oscar.oastsrv.net", "alpha.oastsrv.net", "sierra.oastsrv.net", "tango.oastsrv.net"},
 	HTTPTimeout:              10 * time.Second,
@@ -63,26 +59,22 @@ var DefaultOptions = Options{
 	CorrelationIdNonceLength: 8,
 }
 
-// fallbackServerURLs are public interactsh servers tried when primary defaults all fail.
+// fallbackServerURLs are public interactsh servers tried when defaults all fail.
 // Only used when the caller did not explicitly provide ServerURLs.
 var fallbackServerURLs = []string{"oast.pro", "oast.live", "oast.site", "oast.online", "oast.fun", "oast.me"}
 
 // defaultServerCorrelationIdLength is the CorrelationIdLength used by the default go-appsec servers.
 const defaultServerCorrelationIdLength = 16
 
-// fallbackCorrelationIdLength is the minimum CorrelationIdLength required by
-// fallback servers (public oast.* servers use the interactsh default cidl=20).
+// fallbackCorrelationIdLength is the minimum CorrelationIdLength for fallback
+// servers (oast.* use cidl=20).
 const fallbackCorrelationIdLength = 20
 
-// fallbackMinNonceLength is the minimum CorrelationIdNonceLength required by
-// fallback servers (public oast.* servers use the interactsh default cidn=13).
+// fallbackMinNonceLength is the minimum CorrelationIdNonceLength for fallback
+// servers (oast.* use cidn=13).
 const fallbackMinNonceLength = 13
 
-// newSecureHTTPClient creates an HTTP client with secure defaults:
-// - Does NOT follow redirects (returns error on redirect)
-// - Reasonable timeouts for connection, TLS handshake, and total request
-// - Connection pooling with sensible limits
-// - Custom User-Agent header on all requests
+// newSecureHTTPClient creates an HTTP client with secure defaults.
 func newSecureHTTPClient(timeout time.Duration) *http.Client {
 	return &http.Client{
 		Timeout: timeout,
@@ -106,7 +98,7 @@ func newSecureHTTPClient(timeout time.Duration) *http.Client {
 	}
 }
 
-// userAgentTransport wraps an http.RoundTripper to add a User-Agent header to all requests.
+// userAgentTransport wraps an http.RoundTripper to add a User-Agent header.
 type userAgentTransport struct {
 	base      http.RoundTripper
 	userAgent string

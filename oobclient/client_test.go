@@ -135,7 +135,7 @@ func TestTryRegisterServers(t *testing.T) {
 			httpClient:          newSecureHTTPClient(time.Second),
 		}
 
-		// All fail servers plus one success — rotation ensures success is reached
+		// All fail servers plus one success - rotation ensures success is reached
 		servers := []string{failServer.URL, failServer.URL, failServer.URL, successServer.URL}
 		err := client.tryRegisterServers(t.Context(), servers)
 		require.NoError(t, err)
