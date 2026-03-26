@@ -464,20 +464,41 @@ The decrypted interaction JSON has this structure:
 | `unique-id` | correlation ID | correlation ID | correlation ID | — | correlation ID | — | — |
 | `full-id` | subdomain prefix | subdomain prefix | recipient domain prefix | — | BaseDN prefix | — | — |
 | `q-type` | — | query type (A, AAAA, TXT, …) | — | — | — | — | — |
-| `raw-request` | full HTTP request dump | DNS message string | full email body | command + params | operation details | log entry | log entry |
+| `raw-request` | full HTTP request dump | DNS message string | full email body | FTP command + description (see below) | operation details | log entry | log entry |
 | `raw-response` | full HTTP response dump | DNS response message string | — | — | — | — | — |
 | `smtp-from` | — | — | MAIL FROM address | — | — | — | — |
-| `remote-address` | IP:port | IP | IP | IP:port | IP | — | — |
+| `remote-address` | IP | IP | IP | IP:port | IP:port | — | — |
 
 FTP, SMB, and Responder interactions are stored under the server auth token rather than a correlation ID; `unique-id` and `full-id` are empty for these protocols. They appear in the `extra` field of poll responses.
 
-**`remote-address` format:** For HTTP, the IP:port is extracted from the TCP connection's remote address via `net.SplitHostPort` (IP portion only) unless `--origin-ip-header` is set, in which case the header value is used as-is. For DNS, `net.SplitHostPort` is applied to the writer's `RemoteAddr()` (IP only, no port). For SMTP, `net.SplitHostPort` on the connection's remote address (IP only). For FTP, `ctx.Sess.RemoteAddr().String()` is used directly (IP:port).
+**`remote-address` format:** For HTTP, the IP is extracted from the TCP connection's remote address via `net.SplitHostPort` (IP portion only) unless `--origin-ip-header` is set, in which case the header value is used as-is. For DNS, `net.SplitHostPort` is applied to the writer's `RemoteAddr()` (IP only, no port). For SMTP, `net.SplitHostPort` on the connection's remote address (IP only). For LDAP, `m.Client.Addr().String()` is used directly (IP:port). For FTP, `ctx.Sess.RemoteAddr().String()` is used directly (IP:port).
 
 **HTTP raw-request / raw-response format:** Produced by `httputil.DumpRequest(req, true)` and `httputil.DumpResponse(resp, true)` respectively — standard Go text format with HTTP method/status line, headers, blank line, and body.
 
 **DNS raw-request / raw-response format:** The string representation produced by the `miekg/dns` library's `.String()` method — a human-readable multi-line text dump of the DNS message including all sections (question, answer, authority, additional). Not raw wire bytes.
 
 **LDAP raw-request format:** A multi-line text block with `Type=<operation>` and operation-specific fields. For Search operations this includes `BaseDn`, `Filter`, `FilterString`, and `Attributes` fields. For other operations it includes the relevant entity or attribute information.
+
+**FTP raw-request format:** A two-line text block. Line 1 is the FTP protocol command and its parameters (`ctx.Cmd` + space + `ctx.Param` from the goftp.io Notifier hook context). Line 2 is a human-readable description of the operation. Both Before and After Notifier hooks fire per operation, producing two interactions each.
+
+Format: `<COMMAND> <params>\n<description>`
+
+| Hook | Line 1 example | Line 2 example |
+|------|---------------|----------------|
+| `BeforeLoginUser` | `USER alice` | `alice logging in` |
+| `AfterUserLogin` | `PASS secret` | `user alice logged in with password secret` |
+| `BeforePutFile` | `STOR /file.txt` | `uploading /file.txt` |
+| `AfterFilePut` | `STOR /file.txt` | `uploaded /file.txt` |
+| `BeforeDeleteFile` | `DELE /file.txt` | `deleting /file.txt` |
+| `AfterFileDeleted` | `DELE /file.txt` | `deleted /file.txt` |
+| `BeforeDownloadFile` | `RETR /file.txt` | `downloading file /file.txt` |
+| `AfterFileDownloaded` | `RETR /file.txt` | `downloaded file /file.txt` |
+| `BeforeChangeCurDir` | `CWD /newdir` | `changing directory from / to /newdir` |
+| `AfterCurDirChanged` | `CWD /newdir` | `changed directory from / to /newdir` |
+| `BeforeCreateDir` | `MKD /newdir` | `creating directory /newdir` |
+| `AfterDirCreated` | `MKD /newdir` | `created directory /newdir` |
+| `BeforeDeleteDir` | `RMD /dir` | `deleting directory /dir` |
+| `AfterDirDeleted` | `RMD /dir` | `delete directory /dir` |
 
 **SMTP raw-request:** The complete email data (body and headers as received from the DATA command). The `smtp-from` field carries the MAIL FROM address separately.
 
