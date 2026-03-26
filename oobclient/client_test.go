@@ -788,8 +788,9 @@ func TestNew(t *testing.T) {
 	t.Run("sends_valid_registration_request", func(t *testing.T) {
 		var receivedBody registerRequest
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			body, _ := io.ReadAll(r.Body)
-			_ = json.Unmarshal(body, &receivedBody)
+			body, err := io.ReadAll(r.Body)
+			assert.NoError(t, err)
+			assert.NoError(t, json.Unmarshal(body, &receivedBody))
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"message":"registration successful"}`))
 		}))
@@ -1369,8 +1370,9 @@ func TestDeregistration(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write([]byte(`{"message":"registration successful"}`))
 			case strings.HasSuffix(r.URL.Path, "/deregister"):
-				body, _ := io.ReadAll(r.Body)
-				_ = json.Unmarshal(body, &receivedBody)
+				body, err := io.ReadAll(r.Body)
+				assert.NoError(t, err)
+				assert.NoError(t, json.Unmarshal(body, &receivedBody))
 				w.WriteHeader(http.StatusOK)
 			}
 		}))
@@ -1719,8 +1721,9 @@ func TestPollingWithEncryptedData(t *testing.T) {
 			case strings.HasSuffix(r.URL.Path, "/register"):
 				// Capture public key from registration
 				var req registerRequest
-				body, _ := io.ReadAll(r.Body)
-				_ = json.Unmarshal(body, &req)
+				body, err := io.ReadAll(r.Body)
+				assert.NoError(t, err)
+				assert.NoError(t, json.Unmarshal(body, &req))
 				mu.Lock()
 				clientPublicKeyB64 = req.PublicKey
 				mu.Unlock()
@@ -1896,8 +1899,9 @@ func TestPollingWithEncryptedData(t *testing.T) {
 			switch {
 			case strings.HasSuffix(r.URL.Path, "/register"):
 				var req registerRequest
-				body, _ := io.ReadAll(r.Body)
-				_ = json.Unmarshal(body, &req)
+				body, err := io.ReadAll(r.Body)
+				assert.NoError(t, err)
+				assert.NoError(t, json.Unmarshal(body, &req))
 				mu.Lock()
 				clientPublicKeyB64 = req.PublicKey
 				mu.Unlock()
