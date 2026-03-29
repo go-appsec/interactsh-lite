@@ -2,7 +2,7 @@
 
 > Derived from [ProjectDiscovery/interactsh](https://github.com/projectdiscovery/interactsh). Current through v1.3.1.
 
-This document specifies the network protocol for communication between interactsh clients and servers. A conforming implementation must follow these specifications exactly to ensure compatibility.
+This document specifies the network protocol for communication between interactsh clients and servers.
 
 ## Table of Contents
 
@@ -97,7 +97,7 @@ Each interaction in the `data` array is AES encrypted. Decrypt as follows:
 4. Decrypt using AES-256-CTR mode
 5. Trim trailing whitespace (`\t`, `\r`, `\n`, space) from the plaintext before JSON parsing
 
-**No padding is applied.** AES-256-CTR is a stream cipher — the ciphertext is exactly the same length as the plaintext. The server encrypts JSON-marshaled interaction bytes directly without padding. The trailing whitespace trim in step 5 is defensive: older server versions (pre-v1.3.0) used `json.NewEncoder().Encode()` which appends a `\n` to the JSON output. Current servers use `json.Marshal()` which produces no trailing whitespace. Clients should still trim for compatibility with older servers.
+**No padding is applied.** AES-256-CTR is a stream cipher - the ciphertext is exactly the same length as the plaintext. The server encrypts JSON-marshaled interaction bytes directly without padding. The trailing whitespace trim in step 5 is defensive: older server versions (pre-v1.3.0) used `json.NewEncoder().Encode()` which appends a `\n` to the JSON output. Current servers use `json.Marshal()` which produces no trailing whitespace. Clients should still trim for compatibility with older servers.
 
 **Pseudocode:**
 ```
@@ -221,9 +221,9 @@ Authorization: <token>  (optional, if server requires auth)
 | `tlddata` | `[]string` | No | Plaintext interactions sent to the root domain (wildcard mode only) |
 
 **Notes:**
-- **`data` uses destructive reads** — all accumulated per-client interactions are returned and then deleted from server storage. A subsequent poll with no new interactions returns empty `data`. Interactions are returned in capture order (FIFO, oldest first)
-- **`extra` and `tlddata` use per-consumer read offsets** keyed by the polling client's correlation ID — data is retained on the server and each client independently tracks its read position, receiving only new interactions since its last poll
-- When empty, `data` and `extra` serialize as JSON `null` (nil slice), not `[]` — clients must handle both
+- **`data` uses destructive reads** - all accumulated per-client interactions are returned and then deleted from server storage. A subsequent poll with no new interactions returns empty `data`. Interactions are returned in capture order (FIFO, oldest first)
+- **`extra` and `tlddata` use per-consumer read offsets** keyed by the polling client's correlation ID - data is retained on the server and each client independently tracks its read position, receiving only new interactions since its last poll
+- When empty, `data` and `extra` serialize as JSON `null` (nil slice), not `[]` - clients must handle both
 - `tlddata` key is omitted from the JSON object entirely when empty (no root-domain interactions, `omitempty` tag)
 - `extra` is always present in the JSON (no `omitempty`)
 - `aes_key` contains the RSA-encrypted AES key when `data` is non-empty; empty string when `data` is empty. This is safe because clients iterate `data` before attempting AES key decryption
@@ -348,7 +348,7 @@ All HTTP requests that do not match the API endpoints (`/register`, `/poll`, `/d
 | `/` (root) | text/html | Server banner page (customizable) |
 | all other | text/html | `<html><head></head><body><reflection></body></html>` |
 
-The `<reflection>` value is the character-reversed full matched label — the entire `correlationID+nonce` string extracted from the Host header using the server's correlation ID matching logic. If no valid label is found, the reflection value is an empty string. This allows clients to verify that the server actually received and processed the request.
+The `<reflection>` value is the character-reversed full matched label - the entire `correlationID+nonce` string extracted from the Host header using the server's correlation ID matching logic. If no valid label is found, the reflection value is an empty string. This allows clients to verify that the server actually received and processed the request.
 
 **Dynamic Response Parameters (when enabled on the server):**
 
@@ -450,8 +450,8 @@ The decrypted interaction JSON has this structure:
 
 **`unique-id` vs `full-id`:**
 
-- `unique-id` — the correlation ID portion only; the first `CorrelationIdLength` characters of the matched subdomain label. For a default-length ID this is exactly 20 characters.
-- `full-id` — everything before the server's domain suffix (the `subdomainOf` result). For a typical payload URL `<correlationID><nonce>.<server-host>`, this is the full `correlationID+nonce` label (`TotalIdLength` characters). If the payload has additional subdomain labels (e.g., `nonce.corrID.<server-host>`), `full-id` includes all of them dot-separated. For root TLD interactions (wildcard mode), both fields are set to the full queried domain string.
+- `unique-id` - the correlation ID portion only; the first `CorrelationIdLength` characters of the matched subdomain label. For a default-length ID this is exactly 20 characters.
+- `full-id` - everything before the server's domain suffix (the `subdomainOf` result). For a typical payload URL `<correlationID><nonce>.<server-host>`, this is the full `correlationID+nonce` label (`TotalIdLength` characters). If the payload has additional subdomain labels (e.g., `nonce.corrID.<server-host>`), `full-id` includes all of them dot-separated. For root TLD interactions (wildcard mode), both fields are set to the full queried domain string.
 
 **Omitempty fields:** `q-type`, `raw-request`, `raw-response`, and `smtp-from` are omitted from the JSON when empty. `protocol`, `unique-id`, `full-id`, `remote-address`, and `timestamp` are always present.
 
@@ -461,21 +461,21 @@ The decrypted interaction JSON has this structure:
 
 | Field | http/https | dns | smtp | ftp | ldap | smb | responder |
 |-------|-----------|-----|------|-----|------|-----|-----------|
-| `unique-id` | correlation ID | correlation ID | correlation ID | — | correlation ID | — | — |
-| `full-id` | subdomain prefix | subdomain prefix | recipient domain prefix | — | BaseDN prefix | — | — |
-| `q-type` | — | query type (A, AAAA, TXT, …) | — | — | — | — | — |
+| `unique-id` | correlation ID | correlation ID | correlation ID | - | correlation ID | - | - |
+| `full-id` | subdomain prefix | subdomain prefix | recipient domain prefix | - | BaseDN prefix | - | - |
+| `q-type` | - | query type (A, AAAA, TXT, ...) | - | - | - | - | - |
 | `raw-request` | full HTTP request dump | DNS message string | full email body | FTP command + description (see below) | operation details | log entry | log entry |
-| `raw-response` | full HTTP response dump | DNS response message string | — | — | — | — | — |
-| `smtp-from` | — | — | MAIL FROM address | — | — | — | — |
-| `remote-address` | IP | IP | IP | IP:port | IP:port | — | — |
+| `raw-response` | full HTTP response dump | DNS response message string | - | - | - | - | - |
+| `smtp-from` | - | - | MAIL FROM address | - | - | - | - |
+| `remote-address` | IP | IP | IP | IP:port | IP:port | - | - |
 
 FTP, SMB, and Responder interactions are stored under the server auth token rather than a correlation ID; `unique-id` and `full-id` are empty for these protocols. They appear in the `extra` field of poll responses.
 
 **`remote-address` format:** For HTTP, the IP is extracted from the TCP connection's remote address via `net.SplitHostPort` (IP portion only) unless `--origin-ip-header` is set, in which case the header value is used as-is. For DNS, `net.SplitHostPort` is applied to the writer's `RemoteAddr()` (IP only, no port). For SMTP, `net.SplitHostPort` on the connection's remote address (IP only). For LDAP, `m.Client.Addr().String()` is used directly (IP:port). For FTP, `ctx.Sess.RemoteAddr().String()` is used directly (IP:port).
 
-**HTTP raw-request / raw-response format:** Produced by `httputil.DumpRequest(req, true)` and `httputil.DumpResponse(resp, true)` respectively — standard Go text format with HTTP method/status line, headers, blank line, and body.
+**HTTP raw-request / raw-response format:** Produced by `httputil.DumpRequest(req, true)` and `httputil.DumpResponse(resp, true)` respectively - standard Go text format with HTTP method/status line, headers, blank line, and body.
 
-**DNS raw-request / raw-response format:** The string representation produced by the `miekg/dns` library's `.String()` method — a human-readable multi-line text dump of the DNS message including all sections (question, answer, authority, additional). Not raw wire bytes.
+**DNS raw-request / raw-response format:** The string representation produced by the `miekg/dns` library's `.String()` method - a human-readable multi-line text dump of the DNS message including all sections (question, answer, authority, additional). Not raw wire bytes.
 
 **LDAP raw-request format:** A multi-line text block with `Type=<operation>` and operation-specific fields. For Search operations this includes `BaseDn`, `Filter`, `FilterString`, and `Attributes` fields. For other operations it includes the relevant entity or attribute information.
 
@@ -577,8 +577,8 @@ For the client, generate `CorrelationIdNonceLength` random bytes, encode with zb
    }
 
 9. Client decrypts:
-   - RSA-OAEP decrypt aes_key → 32-byte AES key
-   - AES-CTR decrypt data[0] → interaction JSON (trim trailing whitespace)
+   - RSA-OAEP decrypt aes_key -> 32-byte AES key
+   - AES-CTR decrypt data[0] -> interaction JSON (trim trailing whitespace)
 
 10. Parsed interaction:
     {
