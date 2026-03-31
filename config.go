@@ -28,6 +28,8 @@ type Config struct {
 	LDAPOnly                 bool          `yaml:"ldap-only"`
 	JSON                     bool          `yaml:"json"`
 	Verbose                  bool          `yaml:"verbose"`
+	Timeout                  time.Duration `yaml:"timeout"`
+	Count                    int           `yaml:"count"`
 }
 
 // LoadConfig loads configuration from a YAML file, applying defaults for unset values.

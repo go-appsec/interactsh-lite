@@ -60,6 +60,18 @@ number: 10
 		assert.Equal(t, time.Minute, cfg.KeepAliveInterval)
 	})
 
+	t.Run("timeout_and_count", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "config.yaml")
+		content := "timeout: 30s\ncount: 10\n"
+		require.NoError(t, os.WriteFile(path, []byte(content), 0600))
+
+		cfg, err := LoadConfig(path)
+		require.NoError(t, err)
+
+		assert.Equal(t, 30*time.Second, cfg.Timeout)
+		assert.Equal(t, 10, cfg.Count)
+	})
+
 	t.Run("nonexistent_file_returns_defaults", func(t *testing.T) {
 		cfg, err := LoadConfig("/nonexistent/path/config.yaml")
 		require.NoError(t, err)
@@ -70,6 +82,8 @@ number: 10
 		assert.Zero(t, cfg.CorrelationIdLength)
 		assert.Zero(t, cfg.CorrelationIdNonceLength)
 		assert.Equal(t, time.Minute, cfg.KeepAliveInterval)
+		assert.Zero(t, cfg.Timeout)
+		assert.Zero(t, cfg.Count)
 	})
 
 	t.Run("invalid_yaml", func(t *testing.T) {

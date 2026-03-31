@@ -603,9 +603,6 @@ func (c *Client) IsClosed() bool {
 // After Close returns, the client cannot be reused.
 //
 // Close is safe to call multiple times; subsequent calls return nil.
-//
-// Close attempts to deregister from the server but does not return an error
-// if deregistration fails (the session will eventually expire server-side).
 func (c *Client) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -622,7 +619,6 @@ func (c *Client) Close() error {
 		c.keepAliveCancel()
 		c.keepAliveCancel = nil
 	}
-
 	c.state = stateClosed
 
 	// best-effort deregistration

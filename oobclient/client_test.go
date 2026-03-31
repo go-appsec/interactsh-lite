@@ -1224,6 +1224,7 @@ func TestPolling(t *testing.T) {
 		assert.True(t, client.IsPolling())
 		require.NoError(t, client.StopPolling())
 	})
+
 }
 
 func TestPerformRegistration(t *testing.T) {

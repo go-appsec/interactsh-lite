@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -41,6 +42,8 @@ func main() {
 		verbose          bool
 		payloadStore     bool
 		payloadStoreFile string
+		timeoutFlag      time.Duration
+		countFlag        int
 		showVersion      bool
 		healthCheck      bool
 	)
@@ -77,6 +80,9 @@ func main() {
 	pflag.BoolVar(&payloadStore, "ps", false, "Store payloads to file")
 	pflag.StringVar(&payloadStoreFile, "payload-store-file", "interactsh_payload.txt", "Payload store file path")
 	pflag.StringVar(&payloadStoreFile, "psf", "interactsh_payload.txt", "Payload store file path")
+
+	pflag.DurationVar(&timeoutFlag, "timeout", 0, "Exit after specified duration (e.g. 30s, 5m)")
+	pflag.IntVarP(&countFlag, "count", "c", 0, "Exit after receiving N interactions")
 
 	pflag.BoolVar(&showVersion, "version", false, "Show version")
 	pflag.BoolVar(&healthCheck, "health-check", false, "Run health check")
@@ -149,6 +155,21 @@ func main() {
 	}
 	if pflag.Lookup("verbose").Changed {
 		cfg.Verbose = verbose
+	}
+	if pflag.Lookup("timeout").Changed {
+		cfg.Timeout = timeoutFlag
+	}
+	if pflag.Lookup("count").Changed {
+		cfg.Count = countFlag
+	}
+
+	if cfg.Timeout < 0 {
+		_, _ = fmt.Fprintf(os.Stderr, "[ERR] --timeout must not be negative\n")
+		os.Exit(1)
+	}
+	if cfg.Count < 0 {
+		_, _ = fmt.Fprintf(os.Stderr, "[ERR] --count must not be negative\n")
+		os.Exit(1)
 	}
 
 	allMatchPatterns, err := expandPatterns(matchPatterns)
@@ -248,6 +269,9 @@ func main() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
+	doneCh := make(chan struct{})
+	var displayCount atomic.Int64
+
 	pollInterval := time.Duration(cfg.PollInterval) * time.Second
 	if err := client.StartPolling(pollInterval, func(i *oobclient.Interaction) {
 		if shouldDisplay(i, cfg.DNSOnly, cfg.HTTPOnly, cfg.SMTPOnly, cfg.FTPOnly, cfg.LDAPOnly, matchRegexes, filterRegexes) {
@@ -260,6 +284,11 @@ func main() {
 			if fmtErr != nil {
 				_, _ = fmt.Fprintf(os.Stderr, "[WRN] Format error: %v\n", fmtErr)
 			}
+			if cfg.Count > 0 {
+				if displayCount.Add(1) == int64(cfg.Count) {
+					close(doneCh)
+				}
+			}
 		}
 	}); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "[ERR] Could not start polling: %v\n", err)
@@ -267,22 +296,59 @@ func main() {
 		os.Exit(1)
 	}
 
-	<-sigCh
+	var exitCode int
 
-	if client.IsPolling() {
-		_ = client.StopPolling()
+	var timeoutCh <-chan time.Time
+	if cfg.Timeout > 0 {
+		timeoutCh = time.After(cfg.Timeout)
+	}
+
+	var reason string
+	select {
+	case <-sigCh:
+		reason = "signal"
+	case <-timeoutCh:
+		reason = "timeout"
+	case <-doneCh:
+		reason = "count"
 	}
 
 	if sessionFile != "" {
+		_ = client.StopPolling()
+
 		if saveErr := client.SaveSession(sessionFile); saveErr != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "[WRN] Could not save session: %v\n", saveErr)
 		}
+	} else {
+		_ = client.Close()
 	}
 
-	_ = client.Close()
+	// All callbacks have completed. displayCount is final
+	switch reason {
+	case "signal":
+		fmt.Println("[INF] Received interrupt, shutting down...")
+	case "timeout":
+		if cfg.Count > 0 {
+			received := displayCount.Load()
+			if received >= int64(cfg.Count) {
+				fmt.Printf("[INF] Received %d/%d interactions, shutting down...\n", received, cfg.Count)
+			} else {
+				fmt.Printf("[INF] Timeout reached (%d/%d interactions received), shutting down...\n", received, cfg.Count)
+				exitCode = 1
+			}
+		} else {
+			fmt.Println("[INF] Timeout reached, shutting down...")
+		}
+	case "count":
+		fmt.Printf("[INF] Received %d/%d interactions, shutting down...\n", displayCount.Load(), cfg.Count)
+	}
+
+	if exitCode != 0 {
+		os.Exit(exitCode)
+	}
 }
 
-const dialTimeout = 5 * time.Second
+const dialTimeout = 10 * time.Second
 
 func runHealthCheck(w io.Writer, version, configPath string) {
 	_, _ = fmt.Fprintf(w, "Version: %s\n", version)
