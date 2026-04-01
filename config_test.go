@@ -54,7 +54,7 @@ number: 10
 		assert.Equal(t, "custom.server.com", cfg.Server)
 		assert.Equal(t, 10, cfg.Number)
 		// Defaults preserved for unset values
-		assert.Equal(t, 5, cfg.PollInterval)
+		assert.Equal(t, 2, cfg.PollInterval)
 		assert.Zero(t, cfg.CorrelationIdLength)
 		assert.Zero(t, cfg.CorrelationIdNonceLength)
 		assert.Equal(t, time.Minute, cfg.KeepAliveInterval)
@@ -78,7 +78,7 @@ number: 10
 
 		assert.Empty(t, cfg.Server)
 		assert.Equal(t, 1, cfg.Number)
-		assert.Equal(t, 5, cfg.PollInterval)
+		assert.Equal(t, 2, cfg.PollInterval)
 		assert.Zero(t, cfg.CorrelationIdLength)
 		assert.Zero(t, cfg.CorrelationIdNonceLength)
 		assert.Equal(t, time.Minute, cfg.KeepAliveInterval)

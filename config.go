@@ -36,7 +36,7 @@ type Config struct {
 func LoadConfig(path string) (Config, error) {
 	cfg := Config{
 		Number:            1,
-		PollInterval:      5,
+		PollInterval:      2,
 		KeepAliveInterval: oobclient.DefaultOptions.KeepAliveInterval,
 	}
 
