@@ -95,7 +95,8 @@ func main() {
 		enableColors()
 	}
 
-	fmt.Printf("%s go-appsec/interactsh-lite version %s\n", tagINF, styleWrap(ansiGreen, oobclient.Version))
+	fmt.Printf("%s %s version %s\n",
+		tagINF, styleWrap(ansiBold, "go-appsec/interactsh-lite"), styleWrap(ansiGreen, oobclient.Version))
 	if showVersion {
 		os.Exit(0)
 	}
