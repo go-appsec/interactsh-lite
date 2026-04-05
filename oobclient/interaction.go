@@ -28,6 +28,9 @@ type Interaction struct {
 	// SMTPFrom is the MAIL FROM address. Only for "smtp" protocol.
 	SMTPFrom string `json:"smtp-from,omitempty"`
 
+	// SMTPTo is the RCPT TO address. Only for "smtp" protocol.
+	SMTPTo string `json:"smtp-to,omitempty"`
+
 	// RemoteAddress is the client IP or IP:port that made the interaction.
 	RemoteAddress string `json:"remote-address"`
 
