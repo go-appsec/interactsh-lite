@@ -7,7 +7,7 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6
 	github.com/emersion/go-smtp v0.24.0
-	github.com/go-appsec/interactsh-lite v0.3.1
+	github.com/go-appsec/interactsh-lite v0.3.2
 	github.com/go-ldap/ldap/v3 v3.4.13
 	github.com/libdns/libdns v1.1.1
 	github.com/mackerelio/go-osstat v0.2.7

@@ -127,8 +127,8 @@ github.com/fsnotify/fsnotify v1.6.0 h1:n+5WquG0fcWoWp6xPWfHdbskMCQaFnG6PfBrh1Ky4
 github.com/fsnotify/fsnotify v1.6.0/go.mod h1:sl3t1tCWJFWoRz9R8WJCbQihKKwmorjAbSClcnxKAGw=
 github.com/gaissmai/bart v0.26.0 h1:xOZ57E9hJLBiQaSyeZa9wgWhGuzfGACgqp4BE77OkO0=
 github.com/gaissmai/bart v0.26.0/go.mod h1:GREWQfTLRWz/c5FTOsIw+KkscuFkIV5t8Rp7Nd1Td5c=
-github.com/go-appsec/interactsh-lite v0.3.1 h1:tO2PCzTOiSxqK72jTlb26+APY4Dfk/ObUu7ckBnGXUA=
-github.com/go-appsec/interactsh-lite v0.3.1/go.mod h1:smNgHJdD2XbBw8+AJmO7XPAZfp1umwUNsDLwqOuaZFo=
+github.com/go-appsec/interactsh-lite v0.3.2 h1:2l79yHSMYckvIJvIZjqXc+JguE6rF5iBi2R/1l/c4uo=
+github.com/go-appsec/interactsh-lite v0.3.2/go.mod h1:smNgHJdD2XbBw8+AJmO7XPAZfp1umwUNsDLwqOuaZFo=
 github.com/go-asn1-ber/asn1-ber v1.5.8-0.20250403174932-29230038a667 h1:BP4M0CvQ4S3TGls2FvczZtj5Re/2ZzkV9VwqPHH/3Bo=
 github.com/go-asn1-ber/asn1-ber v1.5.8-0.20250403174932-29230038a667/go.mod h1:hEBeB/ic+5LoWskz+yKT7vGhhPYkProFKoKdwZRWMe0=
 github.com/go-gl/glfw v0.0.0-20190409004039-e6da0acd62b1/go.mod h1:vR7hzQXu2zJy9AVAgeJqvqgH9Q5CA+iKCZ2gyEVpxRU=
