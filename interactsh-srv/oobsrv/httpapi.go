@@ -14,13 +14,13 @@ import (
 	"time"
 )
 
-const defaultBannerHTML = `<h1> Interactsh-lite Server </h1>
+const defaultBannerHTML = `<h1>Interactsh-lite Server</h1>
 
-<a href='https://github.com/go-appsec/interactsh-lite'><b>Interactsh-lite</b></a> is an open-source tool for detecting out-of-band interactions. It is a tool designed to detect vulnerabilities that cause external interactions.<br><br>
+<a href='https://github.com/go-appsec/interactsh-lite'><b>Interactsh-lite</b></a> is an open-source tool for detecting out-of-band interactions. It is designed to detect vulnerabilities that cause external network interactions.<br><br>
 
-If you notice any interactions from <b>*.%s</b> in your logs, it's possible that someone (internal security engineers, pen-testers, bug-bounty hunters) has been testing your application.<br><br>
+If you notice interactions with <b>*.%s</b> in your logs, it's possible that someone (security engineers, pen-testers, bug-bounty hunters) has been testing your application.<br><br>
 
-You should investigate the sites where these interactions were generated from, and if a vulnerability exists, examine the root cause and take the necessary steps to mitigate the issue.`
+You should investigate the service that generated these interactions, examine the root cause, and if a vulnerability exists, take the necessary steps to mitigate the issue.`
 
 // maxDynamicDelay caps the ?delay= query parameter to prevent goroutine exhaustion.
 const maxDynamicDelay = 2 * time.Hour
