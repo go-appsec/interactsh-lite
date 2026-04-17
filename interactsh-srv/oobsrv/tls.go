@@ -378,7 +378,32 @@ func (s *Server) provisionACME(ctx context.Context) (*tls.Config, error) {
 	tlsCfg := cfg.TLSConfig()
 	tlsCfg.NextProtos = serverNextProtos
 
+	// Wildcards match only one label, so deeper names (foo.cid.oscar.oastsrv.net) would fail the handshake.
+	// Normalize the SNI to a single-label form under the best-matching configured domain so the *.<domain>
+	// cert gets served. Clients see a cert name mismatch but the handshake completes and the interaction is captured.
+	tlsCfg.GetCertificate = wildcardFallbackCertGetter(tlsCfg.GetCertificate, s.matchedDomain, s.cfg.Domains)
+
 	return tlsCfg, nil
+}
+
+// wildcardFallbackCertGetter rewrites the SNI to wild.<domain> when the incoming name is
+// deeper than a wildcard can match, then delegates to inner so certmagic serves the *.<domain> cert.
+func wildcardFallbackCertGetter(inner func(*tls.ClientHelloInfo) (*tls.Certificate, error), match func(string) (string, bool), domains []string) func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+	return func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+		name := strings.ToLower(hello.ServerName)
+		domain, ok := match(name)
+		if ok && (name == domain || strings.Count(name, ".") <= strings.Count(domain, ".")+1) {
+			return inner(hello) // exact domain or single label below it
+		} else if !ok {
+			if len(domains) == 0 {
+				return inner(hello)
+			}
+			domain = domains[0] // empty or unrelated SNI, choose any domain
+		}
+		rewritten := *hello
+		rewritten.ServerName = "wild." + domain
+		return inner(&rewritten)
+	}
 }
 
 // startHTTPS starts the HTTPS listener. Skipped if no TLS config.

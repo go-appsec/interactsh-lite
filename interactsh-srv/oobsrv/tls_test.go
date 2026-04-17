@@ -4,14 +4,17 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"log/slog"
 	"math/big"
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -336,6 +339,85 @@ func TestGenerateSelfSignedCert(t *testing.T) {
 		// Key usage
 		assert.NotZero(t, cert.KeyUsage&x509.KeyUsageDigitalSignature)
 		assert.Contains(t, cert.ExtKeyUsage, x509.ExtKeyUsageServerAuth)
+	})
+}
+
+func TestWildcardFallbackCertGetter(t *testing.T) {
+	t.Parallel()
+
+	// Build a matcher that mirrors Server.matchedDomain against a fixed domain list.
+	newMatch := func(domains []string) func(string) (string, bool) {
+		return func(name string) (string, bool) {
+			for _, d := range domains {
+				if name == d || strings.HasSuffix(name, "."+d) {
+					return d, true
+				}
+			}
+			return "", false
+		}
+	}
+
+	tests := []struct {
+		name       string
+		domains    []string // longest-first, lowercased
+		sni        string
+		wantSNI    string // SNI passed to inner
+		wantNoCall bool   // inner expected to return an error when false is false? (unused here)
+		innerErr   error
+		wantErr    bool
+	}{
+		{"exact_domain_passthrough", []string{"oscar.oastsrv.net"}, "oscar.oastsrv.net", "oscar.oastsrv.net", false, nil, false},
+		{"single_label_passthrough", []string{"oscar.oastsrv.net"}, "cid.oscar.oastsrv.net", "cid.oscar.oastsrv.net", false, nil, false},
+		{"deep_subdomain_rewritten", []string{"oscar.oastsrv.net"}, "foo.cid.oscar.oastsrv.net", "wild.oscar.oastsrv.net", false, nil, false},
+		{"very_deep_subdomain_rewritten", []string{"oscar.oastsrv.net"}, "foo.bar.cid.oscar.oastsrv.net", "wild.oscar.oastsrv.net", false, nil, false},
+		{"uppercase_sni_lowercased", []string{"oscar.oastsrv.net"}, "FOO.CID.Oscar.OASTSRV.NET", "wild.oscar.oastsrv.net", false, nil, false},
+		{"most_specific_domain_wins", []string{"oscar.oastsrv.net", "oastsrv.net"}, "foo.cid.oscar.oastsrv.net", "wild.oscar.oastsrv.net", false, nil, false},
+		{"empty_sni_uses_first_domain", []string{"oscar.oastsrv.net", "alpha.oastsrv.net"}, "", "wild.oscar.oastsrv.net", false, nil, false},
+		{"unrelated_sni_uses_first_domain", []string{"oscar.oastsrv.net"}, "evil.example.com", "wild.oscar.oastsrv.net", false, nil, false},
+		{"no_domains_configured_passthrough", nil, "anything.example.com", "anything.example.com", false, errors.New("no cert"), true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var seenSNI string
+			inner := func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+				seenSNI = hello.ServerName
+				if tc.innerErr != nil {
+					return nil, tc.innerErr
+				}
+				return &tls.Certificate{}, nil
+			}
+			get := wildcardFallbackCertGetter(inner, newMatch(tc.domains), tc.domains)
+			_, err := get(&tls.ClientHelloInfo{ServerName: tc.sni})
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tc.wantSNI, seenSNI)
+		})
+	}
+
+	t.Run("preserves_hello_fields", func(t *testing.T) {
+		var received *tls.ClientHelloInfo
+		inner := func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			received = hello
+			return &tls.Certificate{}, nil
+		}
+		get := wildcardFallbackCertGetter(inner, newMatch([]string{"oscar.oastsrv.net"}), []string{"oscar.oastsrv.net"})
+		orig := &tls.ClientHelloInfo{
+			ServerName:        "foo.cid.oscar.oastsrv.net",
+			SupportedProtos:   []string{"h2", "http/1.1"},
+			SupportedVersions: []uint16{tls.VersionTLS13},
+		}
+		_, err := get(orig)
+		require.NoError(t, err)
+		require.NotNil(t, received)
+		assert.Equal(t, "wild.oscar.oastsrv.net", received.ServerName)
+		assert.Equal(t, []string{"h2", "http/1.1"}, received.SupportedProtos)
+		assert.Equal(t, []uint16{tls.VersionTLS13}, received.SupportedVersions)
+		// original hello must not be mutated (concurrent handshakes share nothing)
+		assert.Equal(t, "foo.cid.oscar.oastsrv.net", orig.ServerName)
 	})
 }
 
