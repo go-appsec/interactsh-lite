@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 	"math/big"
 	"net"
@@ -29,6 +30,36 @@ import (
 
 // certmagic certificate storage, relative to $HOME
 const certmagicStoragePath = ".local/share/certmagic"
+
+// ALPN list; non-h2 values are handled as HTTP/1.x by net/http, letting scanners
+// with legacy ALPN offers complete the handshake so we can capture the interaction.
+var serverNextProtos = []string{"h2", "http/1.1", "http/1.0", "spdy/3", "spdy/2", "spdy/1", "hq"}
+
+type tlsErrorFilterHandler struct {
+	slog.Handler
+	verbose bool
+}
+
+func (h *tlsErrorFilterHandler) Handle(ctx context.Context, r slog.Record) error {
+	if !h.verbose && strings.HasPrefix(r.Message, "http: TLS handshake error from ") {
+		return nil // don't log handshake errors, frequent from scanners
+	}
+	return h.Handler.Handle(ctx, r)
+}
+
+func (h *tlsErrorFilterHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &tlsErrorFilterHandler{Handler: h.Handler.WithAttrs(attrs), verbose: h.verbose}
+}
+
+func (h *tlsErrorFilterHandler) WithGroup(name string) slog.Handler {
+	return &tlsErrorFilterHandler{Handler: h.Handler.WithGroup(name), verbose: h.verbose}
+}
+
+// httpErrorLog builds http.Server.ErrorLog with TLS handshake noise filtered unless cfg.Debug is enabled.
+func (s *Server) httpErrorLog() *log.Logger {
+	h := &tlsErrorFilterHandler{Handler: s.logger.Handler(), verbose: s.cfg.Debug}
+	return slog.NewLogLogger(h, slog.LevelError)
+}
 
 var defaultACMEResolvers = []string{
 	"1.1.1.1:53",
@@ -94,7 +125,7 @@ func (s *Server) provisionTLS(ctx context.Context) {
 		s.addService(reloader)
 		s.tlsConfig = &tls.Config{
 			GetCertificate: reloader.GetCertificate,
-			NextProtos:     []string{"h2", "http/1.1"},
+			NextProtos:     serverNextProtos,
 		}
 		s.logger.Info("TLS configured with custom certificate (auto-reload enabled)")
 		return
@@ -156,7 +187,7 @@ func generateSelfSignedCert(domains []string) (*tls.Config, error) {
 			Certificate: [][]byte{certDER},
 			PrivateKey:  key,
 		}},
-		NextProtos: []string{"h2", "http/1.1"},
+		NextProtos: serverNextProtos,
 	}, nil
 }
 
@@ -345,7 +376,7 @@ func (s *Server) provisionACME(ctx context.Context) (*tls.Config, error) {
 	// certmagic's TLSConfig sets NextProtos for ACME TLS-ALPN; override
 	// with the protocols we need for serving HTTP/2 and HTTP/1.1.
 	tlsCfg := cfg.TLSConfig()
-	tlsCfg.NextProtos = []string{"h2", "http/1.1"}
+	tlsCfg.NextProtos = serverNextProtos
 
 	return tlsCfg, nil
 }
@@ -367,7 +398,7 @@ func (s *Server) startHTTPS() error {
 			TLSConfig:         s.tlsConfig,
 			ReadHeaderTimeout: 60 * time.Second,
 			IdleTimeout:       2 * time.Minute,
-			ErrorLog:          slog.NewLogLogger(s.logger.Handler(), slog.LevelError),
+			ErrorLog:          s.httpErrorLog(),
 		},
 	}
 	if err := svc.Start(); err != nil {

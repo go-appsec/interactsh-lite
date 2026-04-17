@@ -307,7 +307,7 @@ func TestGenerateSelfSignedCert(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, tlsCfg)
 		assert.Len(t, tlsCfg.Certificates, 1)
-		assert.Equal(t, []string{"h2", "http/1.1"}, tlsCfg.NextProtos)
+		assert.Equal(t, serverNextProtos, tlsCfg.NextProtos)
 	})
 
 	t.Run("cert_properties", func(t *testing.T) {
@@ -363,7 +363,7 @@ func TestProvisionTLS(t *testing.T) {
 
 		require.NotNil(t, srv.tlsConfig)
 		assert.NotNil(t, srv.tlsConfig.GetCertificate)
-		assert.Equal(t, []string{"h2", "http/1.1"}, srv.tlsConfig.NextProtos)
+		assert.Equal(t, serverNextProtos, srv.tlsConfig.NextProtos)
 
 		cert, err := srv.tlsConfig.GetCertificate(nil)
 		require.NoError(t, err)

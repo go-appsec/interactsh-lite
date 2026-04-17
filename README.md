@@ -13,6 +13,7 @@ A lightweight, dependency-minimal Go project for [Interactsh](https://github.com
 - Session persistence for long-running tests
 - Cross-compatible: the go-appsec/interactsh-lite client works with ProjectDiscovery's public servers and the go-appsec/interactsh-lite server; the go-appsec/interactsh-lite server works with both this project's client and ProjectDiscovery's official `interactsh-client`
 - Redirect testing with session-stored or query parameter encoded redirect responses on hosted `*.oastsrv.net` servers
+- Broad HTTPS ALPN support (`h2`, `http/1.1`, `http/1.0`, `spdy/*`, `hq`) so probing with legacy protocol names still complete the TLS handshake and get captured
 - Standalone CLI client (installed as `interactsh-lite`) and server (installed as `interactsh-srv`)
 
 ## Supported Protocols

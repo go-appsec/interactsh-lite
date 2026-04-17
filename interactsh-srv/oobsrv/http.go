@@ -21,7 +21,7 @@ func (s *Server) startHTTP() error {
 			Handler:           s.handler,
 			ReadHeaderTimeout: 60 * time.Second,
 			IdleTimeout:       2 * time.Minute,
-			ErrorLog:          slog.NewLogLogger(s.logger.Handler(), slog.LevelError),
+			ErrorLog:          s.httpErrorLog(),
 		},
 	}
 	if err := svc.Start(); err != nil {
