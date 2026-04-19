@@ -18,7 +18,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/vjeantet/ldapserver v1.0.2-0.20260218215457-e117373377c0
 	go.uber.org/zap v1.27.1
-	goftp.io/server/v2 v2.0.2
+	goftp.io/server/v2 v2.0.3
 	golang.org/x/net v0.53.0
 	gopkg.in/yaml.v3 v3.0.1
 )
