@@ -350,12 +350,18 @@ func (s *Server) provisionACME(ctx context.Context) (*tls.Config, error) {
 	issuerKey := acmeIssuer.IssuerKey()
 	var successCount int
 	var errs []error
-
 	for _, domain := range s.cfg.Domains {
 		certKey := certmagic.StorageKeys.SiteCert(issuerKey, domain)
 		cached := storage.Exists(ctx, certKey)
 
-		if err := cfg.ManageSync(ctx, []string{domain, "*." + domain}); err != nil {
+		err := cfg.ManageSync(ctx, []string{domain, "*." + domain})
+		if err != nil && !cfg.DisableARI && strings.Contains(err.Error(), "ARI 'replaces' field") {
+			// Disable ARI and retry so renewals issue fresh instead
+			s.logger.Warn("ACME ARI replacement rejected; disabling ARI and retrying", "domain", domain, "error", err)
+			cfg.DisableARI = true
+			err = cfg.ManageSync(ctx, []string{domain, "*." + domain})
+		}
+		if err != nil {
 			errs = append(errs, fmt.Errorf("domain %s: %w", domain, err))
 			s.logger.Error("ACME provisioning failed for domain", "domain", domain, "error", err)
 			continue
@@ -371,6 +377,9 @@ func (s *Server) provisionACME(ctx context.Context) (*tls.Config, error) {
 
 	if successCount == 0 {
 		return nil, fmt.Errorf("all domains failed: %w", errors.Join(errs...))
+	} else if cfg.DisableARI && len(errs) == 0 {
+		// every cert was just reissued under the current account, so future ARI replacements will validate
+		cfg.DisableARI = false
 	}
 
 	// certmagic's TLSConfig sets NextProtos for ACME TLS-ALPN; override
