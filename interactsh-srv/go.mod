@@ -19,7 +19,7 @@ require (
 	github.com/vjeantet/ldapserver v1.0.2-0.20260218215457-e117373377c0
 	go.uber.org/zap v1.28.0
 	goftp.io/server/v2 v2.0.3
-	golang.org/x/net v0.54.0
+	golang.org/x/net v0.55.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -147,7 +147,7 @@ require (
 	golang.org/x/mod v0.35.0 // indirect
 	golang.org/x/oauth2 v0.31.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/term v0.43.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 	golang.org/x/tools v0.44.0 // indirect
