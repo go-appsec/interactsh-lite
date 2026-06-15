@@ -46,6 +46,11 @@ func main() {
 		countFlag        int
 		showVersion      bool
 		healthCheck      bool
+
+		redirectFlag       string
+		responseStatusFlag int
+		responseHeaderFlag []string
+		responseBodyFlag   string
 	)
 
 	pflag.StringVarP(&serverFlag, "server", "s", "", "Interactsh server(s) to use (comma-separated)")
@@ -80,6 +85,11 @@ func main() {
 	pflag.BoolVar(&payloadStore, "ps", false, "Store payloads to file")
 	pflag.StringVar(&payloadStoreFile, "payload-store-file", "interactsh_payload.txt", "Payload store file path")
 	pflag.StringVar(&payloadStoreFile, "psf", "interactsh_payload.txt", "Payload store file path")
+
+	pflag.StringVar(&redirectFlag, "redirect", "", "Redirect HTTP requests via 307 to URL (interactsh-lite servers only)")
+	pflag.IntVar(&responseStatusFlag, "response-status", 0, "Stored HTTP response status code (default 200; auth-enabled interactsh-lite servers only)")
+	pflag.StringArrayVar(&responseHeaderFlag, "response-header", nil, "Stored HTTP response header 'Name: Value' (repeatable; auth-enabled interactsh-lite servers only)")
+	pflag.StringVar(&responseBodyFlag, "response-body", "", "Stored HTTP response body (auth-enabled interactsh-lite servers only)")
 
 	pflag.DurationVar(&timeoutFlag, "timeout", 0, "Exit after specified duration (e.g. 30s, 5m)")
 	pflag.IntVarP(&countFlag, "count", "c", 0, "Exit after receiving N interactions")
@@ -168,6 +178,18 @@ func main() {
 	if pflag.Lookup("count").Changed {
 		cfg.Count = countFlag
 	}
+	if pflag.Lookup("redirect").Changed {
+		cfg.Redirect = redirectFlag
+	}
+	if pflag.Lookup("response-status").Changed {
+		cfg.ResponseStatus = responseStatusFlag
+	}
+	if pflag.Lookup("response-header").Changed {
+		cfg.ResponseHeaders = responseHeaderFlag
+	}
+	if pflag.Lookup("response-body").Changed {
+		cfg.ResponseBody = responseBodyFlag
+	}
 
 	if cfg.Timeout < 0 {
 		_, _ = fmt.Fprintf(os.Stderr, "%s --timeout must not be negative\n", tagERR)
@@ -214,6 +236,12 @@ func main() {
 	}
 	output := io.MultiWriter(writers...)
 
+	responseCfg, err := buildResponseConfig(cfg)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "%s %v\n", tagERR, err)
+		os.Exit(1)
+	}
+
 	opts := oobclient.Options{
 		ServerURLs:               ParseCommaSeparated(cfg.Server),
 		Token:                    cfg.Token,
@@ -222,6 +250,7 @@ func main() {
 		DisableHTTPFallback:      cfg.NoHTTPFallback,
 		CorrelationIdLength:      cfg.CorrelationIdLength,
 		CorrelationIdNonceLength: cfg.CorrelationIdNonceLength,
+		Response:                 responseCfg,
 	}
 
 	ctx := context.Background()

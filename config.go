@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,6 +31,10 @@ type Config struct {
 	Verbose                  bool          `yaml:"verbose"`
 	Timeout                  time.Duration `yaml:"timeout"`
 	Count                    int           `yaml:"count"`
+	Redirect                 string        `yaml:"redirect"`
+	ResponseStatus           int           `yaml:"response-status"`
+	ResponseHeaders          []string      `yaml:"response-header"`
+	ResponseBody             string        `yaml:"response-body"`
 }
 
 // LoadConfig loads configuration from a YAML file, applying defaults for unset values.
@@ -51,6 +56,36 @@ func LoadConfig(path string) (Config, error) {
 	// Unmarshal over defaults - YAML only overwrites fields present in file
 	err = yaml.Unmarshal(data, &cfg)
 	return cfg, err
+}
+
+// buildResponseConfig derives the stored response config from CLI/file settings.
+// Returns nil when no response is configured. Errors if --redirect is combined
+// with the --response-* settings.
+func buildResponseConfig(cfg Config) (*oobclient.ResponseConfig, error) {
+	redirectSet := cfg.Redirect != ""
+	responseSet := cfg.ResponseStatus != 0 || len(cfg.ResponseHeaders) > 0 || cfg.ResponseBody != ""
+
+	switch {
+	case redirectSet && responseSet:
+		return nil, errors.New("--redirect cannot be combined with --response-status/--response-header/--response-body")
+	case redirectSet:
+		return &oobclient.ResponseConfig{
+			StatusCode: 307,
+			Headers:    []string{"Location: " + cfg.Redirect},
+		}, nil
+	case responseSet:
+		status := cfg.ResponseStatus
+		if status == 0 {
+			status = 200
+		}
+		return &oobclient.ResponseConfig{
+			StatusCode: status,
+			Headers:    cfg.ResponseHeaders,
+			Body:       cfg.ResponseBody,
+		}, nil
+	default:
+		return nil, nil
+	}
 }
 
 func ParseCommaSeparated(input string) []string {

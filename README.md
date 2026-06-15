@@ -76,6 +76,10 @@ interactsh-lite -v
 | `--ldap-only` | Display only LDAP interactions |
 | `-m, --match` | Regex pattern to include interactions |
 | `-f, --filter` | Regex pattern to exclude interactions |
+| `--redirect` | Redirect HTTP requests via 307 to URL (interactsh-lite servers only) |
+| `--response-status` | Stored HTTP response status code (default: 200; auth-enabled interactsh-lite servers only) |
+| `--response-header` | Stored HTTP response header `Name: Value` (repeatable; auth-enabled interactsh-lite servers only) |
+| `--response-body` | Stored HTTP response body (auth-enabled interactsh-lite servers only) |
 | `-o, --output` | Output file path |
 | `--json` | Output in JSON format |
 | `-v, --verbose` | Verbose output with request/response data |

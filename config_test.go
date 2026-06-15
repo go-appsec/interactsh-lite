@@ -72,6 +72,26 @@ number: 10
 		assert.Equal(t, 10, cfg.Count)
 	})
 
+	t.Run("response_config", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "config.yaml")
+		content := `redirect: "https://example.com"
+response-status: 418
+response-header:
+  - "X-Test: 1"
+  - "X-Other: 2"
+response-body: "hi"
+`
+		require.NoError(t, os.WriteFile(path, []byte(content), 0600))
+
+		cfg, err := LoadConfig(path)
+		require.NoError(t, err)
+
+		assert.Equal(t, "https://example.com", cfg.Redirect)
+		assert.Equal(t, 418, cfg.ResponseStatus)
+		assert.Equal(t, []string{"X-Test: 1", "X-Other: 2"}, cfg.ResponseHeaders)
+		assert.Equal(t, "hi", cfg.ResponseBody)
+	})
+
 	t.Run("nonexistent_file_returns_defaults", func(t *testing.T) {
 		cfg, err := LoadConfig("/nonexistent/path/config.yaml")
 		require.NoError(t, err)
@@ -92,6 +112,50 @@ number: 10
 		require.NoError(t, os.WriteFile(path, []byte("invalid: [yaml: syntax"), 0600))
 
 		_, err := LoadConfig(path)
+		assert.Error(t, err)
+	})
+}
+
+func TestBuildResponseConfig(t *testing.T) {
+	t.Parallel()
+
+	t.Run("redirect_only", func(t *testing.T) {
+		got, err := buildResponseConfig(Config{Redirect: "https://example.com"})
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, 307, got.StatusCode)
+		assert.Equal(t, []string{"Location: https://example.com"}, got.Headers)
+		assert.Empty(t, got.Body)
+	})
+
+	t.Run("response_full", func(t *testing.T) {
+		got, err := buildResponseConfig(Config{
+			ResponseStatus:  418,
+			ResponseHeaders: []string{"X-Test: 1"},
+			ResponseBody:    "hi",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, 418, got.StatusCode)
+		assert.Equal(t, []string{"X-Test: 1"}, got.Headers)
+		assert.Equal(t, "hi", got.Body)
+	})
+
+	t.Run("response_default_status", func(t *testing.T) {
+		got, err := buildResponseConfig(Config{ResponseBody: "hi"})
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, 200, got.StatusCode)
+	})
+
+	t.Run("none", func(t *testing.T) {
+		got, err := buildResponseConfig(Config{})
+		require.NoError(t, err)
+		assert.Nil(t, got)
+	})
+
+	t.Run("redirect_and_response_conflict", func(t *testing.T) {
+		_, err := buildResponseConfig(Config{Redirect: "https://example.com", ResponseStatus: 200})
 		assert.Error(t, err)
 	})
 }
