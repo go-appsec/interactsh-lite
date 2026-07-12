@@ -10,7 +10,7 @@ require (
 	github.com/go-appsec/interactsh-lite v0.3.7
 	github.com/go-ldap/ldap/v3 v3.4.13
 	github.com/libdns/libdns v1.1.1
-	github.com/mackerelio/go-osstat v0.2.7
+	github.com/mackerelio/go-osstat v0.2.8
 	github.com/miekg/dns v1.1.72
 	github.com/projectdiscovery/interactsh v1.3.1
 	github.com/spf13/pflag v1.0.10
