@@ -570,6 +570,15 @@ func TestServeDefault(t *testing.T) {
 		req.Host = host
 		srv.serveDefault(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)
+
+		// Positive out-of-range codes clamp to [100,999]; non-positive fall back to 200
+		for status, want := range map[string]int{"-5": http.StatusOK, "0": http.StatusOK, "1": 100, "1000": 999} {
+			rec = httptest.NewRecorder()
+			req = httptest.NewRequest(http.MethodGet, "/test?status="+status+"&body=ok", nil)
+			req.Host = host
+			srv.serveDefault(rec, req)
+			assert.Equal(t, want, rec.Code, "status=%s", status)
+		}
 	})
 
 	t.Run("dynamic_invalid_b64", func(t *testing.T) {

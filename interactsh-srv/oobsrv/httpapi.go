@@ -251,7 +251,7 @@ func applyDynamicParams(w http.ResponseWriter, r *http.Request) {
 	var statusCode int
 	if st := q.Get("status"); st != "" {
 		if code, err := strconv.Atoi(st); err == nil && code > 0 {
-			statusCode = code
+			statusCode = clampStatusCode(code)
 		}
 	}
 
@@ -398,6 +398,8 @@ func writeResponseConfig(w http.ResponseWriter, r *http.Request, cfg *oobclient.
 	statusCode := cfg.StatusCode
 	if statusCode == 0 {
 		statusCode = http.StatusOK
+	} else {
+		statusCode = clampStatusCode(statusCode)
 	}
 	w.WriteHeader(statusCode)
 

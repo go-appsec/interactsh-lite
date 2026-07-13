@@ -66,7 +66,18 @@ func (r *responseRecorder) WriteHeader(code int) {
 		return
 	}
 	r.wroteHeader = true
-	r.statusCode = code
+	r.statusCode = clampStatusCode(code)
+}
+
+// clampStatusCode bounds code to the range http.ResponseWriter.WriteHeader accepts.
+// Values below 100 (including 0 and negatives) become 100; values above 999 become 999.
+func clampStatusCode(code int) int {
+	if code < 100 {
+		return 100
+	} else if code > 999 {
+		return 999
+	}
+	return code
 }
 
 func (r *responseRecorder) Write(b []byte) (int, error) {
