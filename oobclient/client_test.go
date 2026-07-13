@@ -545,6 +545,51 @@ func TestSaveLoadSession(t *testing.T) {
 		assert.Equal(t, client.CorrelationID(), loaded.CorrelationID())
 	})
 
+	t.Run("preserves_response_config", func(t *testing.T) {
+		server := newMockServer(t)
+
+		response := &ResponseConfig{
+			StatusCode: 302,
+			Headers:    []string{"Location: https://example.com"},
+		}
+		client, err := New(t.Context(), Options{
+			ServerURLs:       []string{server.URL},
+			DisableKeepAlive: true,
+			Response:         response,
+		})
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = client.Close() })
+
+		tmpDir := t.TempDir()
+		sessionPath := filepath.Join(tmpDir, "session.yaml")
+		require.NoError(t, client.SaveSession(sessionPath))
+
+		loaded, err := LoadSession(t.Context(), sessionPath)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = loaded.Close() })
+
+		assert.Equal(t, response, loaded.response)
+	})
+
+	t.Run("omits_response_when_unset", func(t *testing.T) {
+		server := newMockServer(t)
+
+		client, err := New(t.Context(), Options{
+			ServerURLs:       []string{server.URL},
+			DisableKeepAlive: true,
+		})
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = client.Close() })
+
+		tmpDir := t.TempDir()
+		sessionPath := filepath.Join(tmpDir, "session.yaml")
+		require.NoError(t, client.SaveSession(sessionPath))
+
+		data, err := os.ReadFile(sessionPath)
+		require.NoError(t, err)
+		assert.NotContains(t, string(data), "response:")
+	})
+
 	t.Run("file_not_found", func(t *testing.T) {
 		_, err := LoadSession(t.Context(), "/nonexistent/path/session.yaml")
 		require.Error(t, err)

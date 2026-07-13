@@ -12,9 +12,9 @@ import (
 // session's correlation ID. Supported only by the interactsh-lite server.
 // On unauthenticated servers, only 302/307 redirects with a Location header are allowed.
 type ResponseConfig struct {
-	StatusCode int      `json:"status-code,omitempty"` // HTTP status code
-	Headers    []string `json:"headers,omitempty"`     // "Name: Value" format
-	Body       string   `json:"body,omitempty"`        // response body
+	StatusCode int      `json:"status-code,omitempty" yaml:"status-code,omitempty"` // HTTP status code
+	Headers    []string `json:"headers,omitempty" yaml:"headers,omitempty"`         // "Name: Value" format
+	Body       string   `json:"body,omitempty" yaml:"body,omitempty"`               // response body
 }
 
 // IsAllowedUnauthenticated reports whether this config is valid for an unauthenticated server.

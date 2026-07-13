@@ -217,7 +217,8 @@ func New(ctx context.Context, opts ...Options) (*Client, error) {
 // tryRegisterServers attempts registration starting at a random index.
 func (c *Client) tryRegisterServers(ctx context.Context, serverURLs []string) error {
 	n := len(serverURLs)
-	start := int(atomic.AddUint32(&serverStartIndex, 1)) % n
+	// int64 cast keeps the value non-negative on 32-bit platforms (uint32 fits in int64)
+	start := int(int64(atomic.AddUint32(&serverStartIndex, 1)) % int64(n))
 
 	var errs []error
 	var failedIPs []string
@@ -688,6 +689,7 @@ func (c *Client) SaveSession(path string) error {
 		CorrelationID: c.correlationID,
 		SecretKey:     c.secretKey,
 		PublicKey:     c.publicKeyB64,
+		Response:      c.response,
 	}
 
 	data, err := yaml.Marshal(session)
@@ -781,6 +783,7 @@ func LoadSession(ctx context.Context, path string, opts ...Options) (*Client, er
 		correlationIDNonceLength: correlationIDNonceLength,
 		keepAliveInterval:        keepAliveInterval,
 		disableHTTPFallback:      disableHTTPFallback,
+		response:                 session.Response,
 		state:                    stateIdle,
 	}
 
@@ -818,12 +821,13 @@ type pollResponse struct {
 }
 
 type sessionInfo struct {
-	ServerURL     string `yaml:"server-url"`
-	Token         string `yaml:"server-token"`
-	PrivateKey    string `yaml:"private-key"`
-	CorrelationID string `yaml:"correlation-id"`
-	SecretKey     string `yaml:"secret-key"`
-	PublicKey     string `yaml:"public-key"`
+	ServerURL     string          `yaml:"server-url"`
+	Token         string          `yaml:"server-token"`
+	PrivateKey    string          `yaml:"private-key"`
+	CorrelationID string          `yaml:"correlation-id"`
+	SecretKey     string          `yaml:"secret-key"`
+	PublicKey     string          `yaml:"public-key"`
+	Response      *ResponseConfig `yaml:"response,omitempty"`
 }
 
 func encodePublicKey(pubKey *rsa.PublicKey) (string, error) {
