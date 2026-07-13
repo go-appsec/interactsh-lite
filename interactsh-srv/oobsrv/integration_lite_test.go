@@ -315,7 +315,7 @@ func TestLiteIntegration_session_eviction(t *testing.T) {
 	t.Parallel()
 
 	srv, ts := integrationServer(t, func(c *Config) {
-		c.Eviction = 0 // 0 days = immediate TTL
+		c.Eviction = 1 // 1 day TTL
 	})
 
 	client, err := oobclient.New(t.Context(), oobclient.Options{
@@ -327,8 +327,10 @@ func TestLiteIntegration_session_eviction(t *testing.T) {
 	t.Cleanup(func() { _ = client.Close() })
 
 	cid := client.CorrelationID()
+	require.True(t, srv.storage.HasCorrelationID(cid))
 
-	time.Sleep(time.Millisecond) // ensure time advances past TTL=0
+	// Advance the storage clock past the TTL to trigger lazy eviction
+	srv.storage.(*memoryStorage).clock = func() time.Time { return time.Now().Add(48 * time.Hour) }
 
 	// HasCorrelationID performs lazy eviction
 	assert.False(t, srv.storage.HasCorrelationID(cid))

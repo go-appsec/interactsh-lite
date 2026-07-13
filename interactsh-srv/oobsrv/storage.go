@@ -120,11 +120,15 @@ type memoryStorage struct {
 
 // NewMemoryStorage creates an in-memory storage backend.
 func NewMemoryStorage(cfg Config, logger *slog.Logger) *memoryStorage {
+	evictionDays := cfg.Eviction
+	if evictionDays < 1 { // unset/invalid falls back to the default TTL
+		evictionDays = defaultEvictionDays
+	}
 	return &memoryStorage{
 		sessions:   make(map[string]*Session),
 		lruList:    list.New(),
 		lruMap:     make(map[string]*list.Element),
-		ttl:        time.Duration(cfg.Eviction) * 24 * time.Hour,
+		ttl:        time.Duration(evictionDays) * 24 * time.Hour,
 		noEviction: cfg.NoEviction,
 		slidingTTL: cfg.EvictionStrategy == EvictionSliding,
 		logger:     logger,

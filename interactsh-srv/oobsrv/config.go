@@ -14,6 +14,9 @@ const (
 	EvictionFixed   = "fixed"
 )
 
+// defaultEvictionDays is the session TTL in days used when Eviction is unset (<1).
+const defaultEvictionDays = 30
+
 // Config holds all server configuration. Field values are populated by YAML
 // config loading and CLI flag overrides in the main package.
 type Config struct {
@@ -105,7 +108,7 @@ func (c *Config) UnmarshalYAML(node *yaml.Node) error {
 func DefaultConfig() Config {
 	return Config{
 		ListenIP:              "0.0.0.0",
-		Eviction:              30,
+		Eviction:              defaultEvictionDays,
 		EvictionStrategy:      EvictionSliding,
 		ACAOUrl:               "*",
 		CorrelationIdLength:   20,

@@ -36,6 +36,8 @@ func TestValidate(t *testing.T) {
 		{"invalid_eviction_strategy", func(c *Config) { c.EvictionStrategy = "typo" }, "eviction-strategy"},
 		{"valid_eviction_sliding", func(c *Config) { c.EvictionStrategy = EvictionSliding }, ""},
 		{"valid_eviction_fixed", func(c *Config) { c.EvictionStrategy = EvictionFixed }, ""},
+		{"eviction_zero_defaults", func(c *Config) { c.Eviction = 0 }, ""},
+		{"eviction_negative_defaults", func(c *Config) { c.Eviction = -1 }, ""},
 	}
 
 	for _, tt := range tests {
