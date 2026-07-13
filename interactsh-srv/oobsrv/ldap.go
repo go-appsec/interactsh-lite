@@ -1,6 +1,7 @@
 package oobsrv
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -63,7 +64,8 @@ var _ Service = (*ldapService)(nil)
 func (l *ldapService) Name() string { return l.name }
 
 func (l *ldapService) Start() error {
-	ln, err := net.Listen("tcp", l.addr)
+	var lc net.ListenConfig
+	ln, err := lc.Listen(context.Background(), "tcp", l.addr)
 	if err != nil {
 		return err
 	}
@@ -245,7 +247,7 @@ func (s *Server) handleLDAPStartTLS() ldapserver.HandlerFunc {
 		res.SetResponseName(ldapserver.NoticeOfStartTLS)
 		w.Write(res)
 
-		if err := tlsConn.Handshake(); err != nil {
+		if err := tlsConn.HandshakeContext(context.Background()); err != nil {
 			s.logger.Debug("LDAP StartTLS handshake failed", "error", err)
 			return
 		}

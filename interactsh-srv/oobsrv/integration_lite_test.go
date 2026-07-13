@@ -56,7 +56,8 @@ func integrationClient(t *testing.T, serverURL, token string) *oobclient.Client 
 func integrationDNS(t *testing.T, srv *Server) string {
 	t.Helper()
 
-	pc, err := net.ListenPacket("udp4", "127.0.0.1:0")
+	var lc net.ListenConfig
+	pc, err := lc.ListenPacket(t.Context(), "udp4", "127.0.0.1:0")
 	require.NoError(t, err)
 	addr := pc.LocalAddr().String()
 
@@ -156,7 +157,7 @@ func TestLiteIntegration_http_interaction(t *testing.T) {
 	const nonce = "efgh"
 	payloadHost := payloadDomain(client.CorrelationID(), nonce)
 
-	req, err := http.NewRequest("GET", ts.URL+"/test-path", nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, ts.URL+"/test-path", nil)
 	require.NoError(t, err)
 	req.Host = payloadHost
 	resp, err := http.DefaultClient.Do(req)
@@ -376,7 +377,7 @@ func TestLiteIntegration_wildcard_tlddata(t *testing.T) {
 	client := integrationClient(t, ts.URL, "tok")
 
 	// bare subdomain with no CID triggers wildcard but not correlation match
-	req, err := http.NewRequest("GET", ts.URL+"/wildcard-test", nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, ts.URL+"/wildcard-test", nil)
 	require.NoError(t, err)
 	req.Host = "anything." + testDomain
 	resp, err := http.DefaultClient.Do(req)

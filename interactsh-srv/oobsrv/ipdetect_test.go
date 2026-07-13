@@ -95,7 +95,7 @@ func TestDetectIPExternal(t *testing.T) {
 			checkIPURL = srv.URL
 			t.Cleanup(func() { checkIPURL = old })
 
-			ip, err := detectIPExternal("tcp4")
+			ip, err := detectIPExternal(t.Context(), "tcp4")
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -126,7 +126,8 @@ func TestValidateLocalIP(t *testing.T) {
 }
 
 func TestDetectIPUDP(t *testing.T) {
-	pc, err := net.ListenPacket("udp4", "127.0.0.1:0")
+	var lc net.ListenConfig
+	pc, err := lc.ListenPacket(t.Context(), "udp4", "127.0.0.1:0")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = pc.Close() })
 
@@ -134,7 +135,7 @@ func TestDetectIPUDP(t *testing.T) {
 	udpTarget = pc.LocalAddr().String()
 	t.Cleanup(func() { udpTarget = old })
 
-	ip, err := detectIPUDP("udp4")
+	ip, err := detectIPUDP(t.Context(), "udp4")
 	require.NoError(t, err)
 	assert.Equal(t, "127.0.0.1", ip.String())
 }
@@ -149,7 +150,8 @@ func TestDetectIPv4(t *testing.T) {
 	checkIPURL = srv.URL
 	t.Cleanup(func() { checkIPURL = oldURL })
 
-	pc, err := net.ListenPacket("udp4", "127.0.0.1:0")
+	var lc net.ListenConfig
+	pc, err := lc.ListenPacket(t.Context(), "udp4", "127.0.0.1:0")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = pc.Close() })
 
@@ -157,7 +159,7 @@ func TestDetectIPv4(t *testing.T) {
 	udpTarget = pc.LocalAddr().String()
 	t.Cleanup(func() { udpTarget = oldUDP })
 
-	ip, err := detectIPv4()
+	ip, err := detectIPv4(t.Context())
 	require.NoError(t, err)
 	assert.True(t, validateLocalIP(ip), "expected a local interface IP, got %s", ip)
 }

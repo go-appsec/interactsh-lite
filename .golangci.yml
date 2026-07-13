@@ -22,6 +22,7 @@ linters:
     - mirror
     - misspell
     - musttag
+    - noctx
     - perfsprint
     - prealloc
     - reassign

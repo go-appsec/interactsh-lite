@@ -226,7 +226,7 @@ func (c *Client) tryRegisterServers(ctx context.Context, serverURLs []string) er
 
 		// Skip if this server resolves to an already-failed IP
 		if len(failedIPs) > 0 {
-			if ips, err := net.LookupHost(server); err != nil {
+			if ips, err := net.DefaultResolver.LookupHost(ctx, server); err != nil {
 				errs = append(errs, err)
 				continue
 			} else if slices.ContainsFunc(ips, func(ip string) bool { return slices.Contains(failedIPs, ip) }) {
@@ -236,7 +236,7 @@ func (c *Client) tryRegisterServers(ctx context.Context, serverURLs []string) er
 
 		if err := c.tryRegisterServer(ctx, server); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", server, err))
-			if ips, lookupErr := net.LookupHost(server); lookupErr == nil {
+			if ips, lookupErr := net.DefaultResolver.LookupHost(ctx, server); lookupErr == nil {
 				failedIPs = append(failedIPs, ips...)
 			}
 			continue

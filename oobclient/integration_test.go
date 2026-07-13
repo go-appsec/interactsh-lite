@@ -24,7 +24,9 @@ func verifyHTTPInteraction(t *testing.T, client *Client) {
 	domain := client.Domain()
 
 	httpClient := &http.Client{Timeout: 10 * time.Second}
-	resp, err := httpClient.Get("https://" + domain) // https to verify tls cert
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://"+domain, nil) // https to verify tls cert
+	require.NoError(t, err)
+	resp, err := httpClient.Do(req)
 	if err == nil {
 		require.NoError(t, resp.Body.Close())
 	}
@@ -190,7 +192,9 @@ func TestIntegration_RedirectToTarget(t *testing.T) {
 
 	// Hit redirect domain -> follows redirect to target
 	redirectDomain := redirectClient.Domain()
-	resp, err := httpClient.Get("https://" + redirectDomain)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://"+redirectDomain, nil)
+	require.NoError(t, err)
+	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	require.NoError(t, resp.Body.Close())
 
@@ -204,7 +208,9 @@ func TestIntegration_RedirectToTarget(t *testing.T) {
 	// Param-encoded redirect to a different target subdomain (takes priority over session config)
 	paramTargetDomain := targetClient.Domain()
 	encodedURL := redirectClient.EncodedResponse(302, []string{"Location:https://" + paramTargetDomain}, "")
-	resp2, err := httpClient.Get(encodedURL)
+	req2, err := http.NewRequestWithContext(t.Context(), http.MethodGet, encodedURL, nil)
+	require.NoError(t, err)
+	resp2, err := httpClient.Do(req2)
 	require.NoError(t, err)
 	require.NoError(t, resp2.Body.Close())
 

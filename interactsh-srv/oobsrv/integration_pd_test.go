@@ -143,7 +143,7 @@ func TestPDIntegration_http_interaction(t *testing.T) {
 	const nonce = "efgh"
 	payloadHost := payloadDomain(cid, nonce)
 
-	req, err := http.NewRequest("GET", ts.URL+"/test-path", nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, ts.URL+"/test-path", nil)
 	require.NoError(t, err)
 	req.Host = payloadHost
 	resp, err := http.DefaultClient.Do(req)
@@ -359,7 +359,7 @@ func TestPDIntegration_poll_multi_protocol(t *testing.T) {
 	queryDNS(t, dnsAddr, payloadDomain(cid, "dnsa"), dns.TypeA)
 
 	// trigger HTTP interaction
-	req, err := http.NewRequest("GET", ts.URL+"/multi", nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, ts.URL+"/multi", nil)
 	require.NoError(t, err)
 	req.Host = payloadDomain(cid, "http")
 	resp, err := http.DefaultClient.Do(req)
@@ -449,7 +449,7 @@ func TestPDIntegration_wildcard_tlddata(t *testing.T) {
 	client := pdIntegrationClient(t, ts.URL, "tok")
 
 	// bare subdomain with no CID triggers wildcard
-	req, err := http.NewRequest("GET", ts.URL+"/wildcard-pd", nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, ts.URL+"/wildcard-pd", nil)
 	require.NoError(t, err)
 	req.Host = "anything." + testDomain
 	resp, err := http.DefaultClient.Do(req)
@@ -526,7 +526,10 @@ func TestPDWireFormat_register_request(t *testing.T) {
 	body, err := json.Marshal(regReq)
 	require.NoError(t, err)
 
-	resp, err := http.Post(ts.URL+"/register", "application/json", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, ts.URL+"/register", bytes.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = resp.Body.Close() })
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -655,7 +658,9 @@ func skipIfServerUnreachable(t *testing.T) {
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
 	}
-	resp, err := client.Get("https://" + remoteServerURL)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://"+remoteServerURL, nil)
+	require.NoError(t, err)
+	resp, err := client.Do(req)
 	if err != nil {
 		t.Skipf("remote server unreachable: %v", err)
 	}
@@ -907,7 +912,7 @@ func TestPDRemote(t *testing.T) {
 		const nonce = "geta0"
 		host := remotePayloadDomain(cid, nonce)
 
-		req, err := http.NewRequest("GET", "https://"+remoteServerURL+"/test-get-path", nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://"+remoteServerURL+"/test-get-path", nil)
 		require.NoError(t, err)
 		req.Host = host
 		resp, err := httpClient.Do(req)
@@ -934,7 +939,7 @@ func TestPDRemote(t *testing.T) {
 		host := remotePayloadDomain(cid, nonce)
 		const bodyContent = "SECRET_PAYLOAD_DATA_12345"
 
-		req, err := http.NewRequest("POST", "https://"+remoteServerURL+"/post-endpoint",
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "https://"+remoteServerURL+"/post-endpoint",
 			strings.NewReader(bodyContent))
 		require.NoError(t, err)
 		req.Host = host
@@ -955,7 +960,7 @@ func TestPDRemote(t *testing.T) {
 
 		const nonce = "putz0"
 		host := remotePayloadDomain(cid, nonce)
-		req, err := http.NewRequest("PUT", "https://"+remoteServerURL+"/test-put", nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodPut, "https://"+remoteServerURL+"/test-put", nil)
 		require.NoError(t, err)
 		req.Host = host
 		resp, err := httpClient.Do(req)
@@ -973,7 +978,7 @@ func TestPDRemote(t *testing.T) {
 
 		const nonce = "delz0"
 		host := remotePayloadDomain(cid, nonce)
-		req, err := http.NewRequest("DELETE", "https://"+remoteServerURL+"/test-delete", nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodDelete, "https://"+remoteServerURL+"/test-delete", nil)
 		require.NoError(t, err)
 		req.Host = host
 		resp, err := httpClient.Do(req)
@@ -991,7 +996,7 @@ func TestPDRemote(t *testing.T) {
 
 		const nonce = "headz"
 		host := remotePayloadDomain(cid, nonce)
-		req, err := http.NewRequest("HEAD", "https://"+remoteServerURL+"/test-head", nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodHead, "https://"+remoteServerURL+"/test-head", nil)
 		require.NoError(t, err)
 		req.Host = host
 		resp, err := httpClient.Do(req)
@@ -1009,7 +1014,7 @@ func TestPDRemote(t *testing.T) {
 
 		const nonce = "optsz"
 		host := remotePayloadDomain(cid, nonce)
-		req, err := http.NewRequest("OPTIONS", "https://"+remoteServerURL+"/test-opts", nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodOptions, "https://"+remoteServerURL+"/test-opts", nil)
 		require.NoError(t, err)
 		req.Host = host
 		resp, err := httpClient.Do(req)
@@ -1027,7 +1032,7 @@ func TestPDRemote(t *testing.T) {
 
 		const nonce = "roboz"
 		host := remotePayloadDomain(cid, nonce)
-		req, err := http.NewRequest("GET", "https://"+remoteServerURL+"/robots.txt", nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://"+remoteServerURL+"/robots.txt", nil)
 		require.NoError(t, err)
 		req.Host = host
 		resp, err := httpClient.Do(req)
@@ -1049,7 +1054,7 @@ func TestPDRemote(t *testing.T) {
 
 		const nonce = "jsonz"
 		host := remotePayloadDomain(cid, nonce)
-		req, err := http.NewRequest("GET", "https://"+remoteServerURL+"/data.json", nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://"+remoteServerURL+"/data.json", nil)
 		require.NoError(t, err)
 		req.Host = host
 		resp, err := httpClient.Do(req)
@@ -1071,7 +1076,7 @@ func TestPDRemote(t *testing.T) {
 
 		const nonce = "xmlz0"
 		host := remotePayloadDomain(cid, nonce)
-		req, err := http.NewRequest("GET", "https://"+remoteServerURL+"/data.xml", nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://"+remoteServerURL+"/data.xml", nil)
 		require.NoError(t, err)
 		req.Host = host
 		resp, err := httpClient.Do(req)
@@ -1093,7 +1098,7 @@ func TestPDRemote(t *testing.T) {
 
 		const nonce = "reflz"
 		host := remotePayloadDomain(cid, nonce)
-		req, err := http.NewRequest("GET", "https://"+remoteServerURL+"/reflect-test", nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://"+remoteServerURL+"/reflect-test", nil)
 		require.NoError(t, err)
 		req.Host = host
 		resp, err := httpClient.Do(req)
@@ -1121,7 +1126,7 @@ func TestPDRemote(t *testing.T) {
 
 		queryRemoteDNS(t, remotePayloadDomain(cid, dnsNonce), dns.TypeA)
 
-		req, err := http.NewRequest("GET", "https://"+remoteServerURL+"/multi", nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://"+remoteServerURL+"/multi", nil)
 		require.NoError(t, err)
 		req.Host = remotePayloadDomain(cid, httpNonce)
 		resp, err := httpClient.Do(req)

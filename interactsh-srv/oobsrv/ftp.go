@@ -1,6 +1,7 @@
 package oobsrv
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -270,7 +271,8 @@ func (s *Server) startFTPPort(driver ftpserver.Driver, notifier ftpserver.Notifi
 	if implicitTLS {
 		ln, err = tls.Listen("tcp", addr, s.tlsConfig)
 	} else {
-		ln, err = net.Listen("tcp", addr)
+		var lc net.ListenConfig
+		ln, err = lc.Listen(context.Background(), "tcp", addr)
 	}
 	if err != nil {
 		s.logger.Warn(fmt.Sprintf("[%s] bind failed, skipping", name), "addr", addr, "error", err)

@@ -1,6 +1,7 @@
 package oobsrv
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -157,15 +158,16 @@ var _ Service = (*dnsService)(nil)
 func (d *dnsService) Name() string { return d.name }
 
 func (d *dnsService) Start() error {
+	var lc net.ListenConfig
 	switch d.server.Net {
 	case "udp":
-		pc, err := net.ListenPacket("udp", d.server.Addr)
+		pc, err := lc.ListenPacket(context.Background(), "udp", d.server.Addr)
 		if err != nil {
 			return err
 		}
 		d.server.PacketConn = pc
 	case "tcp":
-		ln, err := net.Listen("tcp", d.server.Addr)
+		ln, err := lc.Listen(context.Background(), "tcp", d.server.Addr)
 		if err != nil {
 			return err
 		}

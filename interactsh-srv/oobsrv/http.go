@@ -1,6 +1,7 @@
 package oobsrv
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -47,7 +48,8 @@ func (h *httpService) Start() error {
 	if h.server.TLSConfig != nil {
 		ln, err = tls.Listen("tcp", h.server.Addr, h.server.TLSConfig)
 	} else {
-		ln, err = net.Listen("tcp", h.server.Addr)
+		var lc net.ListenConfig
+		ln, err = lc.Listen(context.Background(), "tcp", h.server.Addr)
 	}
 	if err != nil {
 		return err

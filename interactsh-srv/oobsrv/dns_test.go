@@ -182,7 +182,8 @@ func testDNSServer(t *testing.T, opts ...func(*Server)) (srv *Server, addr strin
 	}
 
 	// Start DNS on random port
-	pc, err := net.ListenPacket("udp4", "127.0.0.1:0")
+	var lc net.ListenConfig
+	pc, err := lc.ListenPacket(t.Context(), "udp4", "127.0.0.1:0")
 	require.NoError(t, err)
 	addr = pc.LocalAddr().String()
 
@@ -1009,7 +1010,8 @@ func TestStartDNS(t *testing.T) {
 
 	t.Run("tcp_failure_non_fatal", func(t *testing.T) {
 		// Occupy a TCP port so DNS-TCP bind fails
-		tcpLn, err := net.Listen("tcp", "127.0.0.1:0")
+		var lc net.ListenConfig
+		tcpLn, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = tcpLn.Close() })
 		_, portStr, err := net.SplitHostPort(tcpLn.Addr().String())

@@ -67,7 +67,8 @@ func smtpTestServer(t *testing.T, srv *Server, tlsCfg *tls.Config, implicitTLS b
 	if implicitTLS && tlsCfg != nil {
 		ln, err = tls.Listen("tcp", "127.0.0.1:0", tlsCfg)
 	} else {
-		ln, err = net.Listen("tcp", "127.0.0.1:0")
+		var lc net.ListenConfig
+		ln, err = lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	}
 	require.NoError(t, err)
 
@@ -400,7 +401,8 @@ func TestSMTPServer(t *testing.T) {
 		addr, cleanup := smtpTestServer(t, srv, nil, false)
 		t.Cleanup(cleanup)
 
-		conn, err := net.DialTimeout("tcp", addr, time.Second)
+		dialer := net.Dialer{Timeout: time.Second}
+		conn, err := dialer.DialContext(t.Context(), "tcp", addr)
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = conn.Close() })
 
@@ -479,11 +481,11 @@ func TestSMTPServer(t *testing.T) {
 		addr, cleanup := smtpTestServer(t, srv, tlsCfg, true)
 		t.Cleanup(cleanup)
 
-		conn, err := tls.DialWithDialer(
-			&net.Dialer{Timeout: time.Second},
-			"tcp", addr,
-			&tls.Config{InsecureSkipVerify: true},
-		)
+		dialer := tls.Dialer{
+			NetDialer: &net.Dialer{Timeout: time.Second},
+			Config:    &tls.Config{InsecureSkipVerify: true},
+		}
+		conn, err := dialer.DialContext(t.Context(), "tcp", addr)
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = conn.Close() })
 
@@ -721,14 +723,16 @@ func TestTeeListener(t *testing.T) {
 	t.Parallel()
 
 	t.Run("accept_returns_tee_conn", func(t *testing.T) {
-		inner, err := net.Listen("tcp", "127.0.0.1:0")
+		var lc net.ListenConfig
+		inner, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = inner.Close() })
 
 		tl := &teeListener{Listener: inner}
 
 		go func() {
-			conn, _ := net.Dial("tcp", inner.Addr().String())
+			var dialer net.Dialer
+			conn, _ := dialer.DialContext(t.Context(), "tcp", inner.Addr().String())
 			if conn != nil {
 				_ = conn.Close()
 			}
@@ -848,7 +852,8 @@ func TestSMTPRawEnvelopePreservation(t *testing.T) {
 		addr, cleanup := smtpTestServer(t, srv, nil, false)
 		t.Cleanup(cleanup)
 
-		conn, err := net.DialTimeout("tcp", addr, time.Second)
+		dialer := net.Dialer{Timeout: time.Second}
+		conn, err := dialer.DialContext(t.Context(), "tcp", addr)
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = conn.Close() })
 
@@ -944,7 +949,8 @@ func TestStartSMTPPort(t *testing.T) {
 		backend := &smtpBackend{server: srv}
 
 		// Occupy a port
-		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		var lc net.ListenConfig
+		ln, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = ln.Close() })
 		port := ln.Addr().(*net.TCPAddr).Port

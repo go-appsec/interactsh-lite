@@ -2,6 +2,7 @@ package oobsrv
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -384,7 +385,8 @@ func (s *Server) startSMTPPort(backend smtp.Backend, hostname string, port int, 
 	if implicitTLS {
 		ln, err = tls.Listen("tcp", addr, tlsCfg)
 	} else {
-		ln, err = net.Listen("tcp", addr)
+		var lc net.ListenConfig
+		ln, err = lc.Listen(context.Background(), "tcp", addr)
 	}
 	if err != nil {
 		s.logger.Warn(fmt.Sprintf("[%s] bind failed, skipping", name), "addr", addr, "error", err)

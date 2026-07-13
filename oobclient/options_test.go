@@ -81,7 +81,9 @@ func TestNewSecureHTTPClient(t *testing.T) {
 		t.Cleanup(redirectServer.Close)
 
 		client := newSecureHTTPClient(5 * time.Second)
-		resp, err := client.Get(redirectServer.URL + "/start")
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, redirectServer.URL+"/start", nil)
+		require.NoError(t, err)
+		resp, err := client.Do(req)
 		// ErrUseLastResponse causes nil error with the redirect response returned
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = resp.Body.Close() })
@@ -111,7 +113,9 @@ func TestNewSecureHTTPClient(t *testing.T) {
 		t.Cleanup(server.Close)
 
 		client := newSecureHTTPClient(5 * time.Second)
-		resp, err := client.Get(server.URL)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL, nil)
+		require.NoError(t, err)
+		resp, err := client.Do(req)
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = resp.Body.Close() })
 

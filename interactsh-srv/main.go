@@ -453,8 +453,11 @@ func runHealthCheck(w io.Writer, ver, configPath string, configExplicit bool) {
 	}
 	_, _ = fmt.Fprintln(w)
 
+	dialer := net.Dialer{Timeout: 5 * time.Second}
+	ctx := context.Background()
+
 	// UDP
-	udpConn, err := net.DialTimeout("udp", "scanme.sh:53", 5*time.Second)
+	udpConn, err := dialer.DialContext(ctx, "udp", "scanme.sh:53")
 	if err != nil {
 		_, _ = fmt.Fprintf(w, "UDP  (scanme.sh:53): FAIL (%v)\n", err)
 	} else {
@@ -463,8 +466,6 @@ func runHealthCheck(w io.Writer, ver, configPath string, configExplicit bool) {
 	}
 
 	// TCP IPv4
-	dialer := net.Dialer{Timeout: 5 * time.Second}
-	ctx := context.Background()
 	tcpV4, err := dialer.DialContext(ctx, "tcp4", "scanme.sh:80")
 	if err != nil {
 		_, _ = fmt.Fprintf(w, "TCP4 (scanme.sh:80): FAIL (%v)\n", err)

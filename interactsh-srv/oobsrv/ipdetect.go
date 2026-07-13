@@ -46,15 +46,16 @@ func ClassifyIPs(ips []string) ServerIPs {
 func DetectIPs(logger *slog.Logger) (ServerIPs, error) {
 	var result ServerIPs
 	var v4err, v6err error
+	ctx := context.Background()
 
-	if ip, err := detectIPv4(); err != nil {
+	if ip, err := detectIPv4(ctx); err != nil {
 		v4err = err
 		logger.Debug("ipv4 auto-detection failed", "error", err)
 	} else {
 		result.IPv4 = []net.IP{ip}
 	}
 
-	if ip, err := detectIPv6(); err != nil {
+	if ip, err := detectIPv6(ctx); err != nil {
 		v6err = err
 		logger.Debug("ipv6 auto-detection failed", "error", err)
 	} else {
@@ -67,26 +68,26 @@ func DetectIPs(logger *slog.Logger) (ServerIPs, error) {
 	return result, nil
 }
 
-func detectIPv4() (net.IP, error) {
-	if ip, err := detectIPExternal("tcp4"); err == nil {
+func detectIPv4(ctx context.Context) (net.IP, error) {
+	if ip, err := detectIPExternal(ctx, "tcp4"); err == nil {
 		if validateLocalIP(ip) {
 			return ip, nil
 		}
 	}
-	return detectIPUDP("udp4")
+	return detectIPUDP(ctx, "udp4")
 }
 
-func detectIPv6() (net.IP, error) {
-	if ip, err := detectIPExternal("tcp6"); err == nil {
+func detectIPv6(ctx context.Context) (net.IP, error) {
+	if ip, err := detectIPExternal(ctx, "tcp6"); err == nil {
 		if validateLocalIP(ip) {
 			return ip, nil
 		}
 	}
-	return detectIPUDP("udp6")
+	return detectIPUDP(ctx, "udp6")
 }
 
 // detectIPExternal queries an external service for the public IP.
-func detectIPExternal(network string) (net.IP, error) {
+func detectIPExternal(ctx context.Context, network string) (net.IP, error) {
 	dialer := &net.Dialer{Timeout: 2 * time.Second}
 	client := &http.Client{
 		Timeout: 2 * time.Second,
@@ -100,7 +101,11 @@ func detectIPExternal(network string) (net.IP, error) {
 		},
 	}
 
-	resp, err := client.Get(checkIPURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, checkIPURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("external ip check: %w", err)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("external ip check: %w", err)
 	}
@@ -148,8 +153,9 @@ func validateLocalIP(ip net.IP) bool {
 }
 
 // detectIPUDP discovers outbound IP via UDP socket. No data is sent.
-func detectIPUDP(network string) (net.IP, error) {
-	conn, err := net.Dial(network, udpTarget)
+func detectIPUDP(ctx context.Context, network string) (net.IP, error) {
+	var dialer net.Dialer
+	conn, err := dialer.DialContext(ctx, network, udpTarget)
 	if err != nil {
 		return nil, fmt.Errorf("udp dial: %w", err)
 	}

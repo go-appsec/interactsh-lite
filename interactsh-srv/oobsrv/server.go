@@ -365,7 +365,8 @@ func newPprofService(logger *slog.Logger) *pprofService {
 func (p *pprofService) Name() string { return "pprof" }
 
 func (p *pprofService) Start() error {
-	ln, err := net.Listen("tcp", p.server.Addr)
+	var lc net.ListenConfig
+	ln, err := lc.Listen(context.Background(), "tcp", p.server.Addr)
 	if err != nil {
 		return err
 	}

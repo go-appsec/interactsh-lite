@@ -44,7 +44,8 @@ func ftpTestServer(t *testing.T, srv *Server, tlsCfg *tls.Config, implicitTLS bo
 	if implicitTLS && tlsCfg != nil {
 		ln, err = tls.Listen("tcp", "127.0.0.1:0", tlsCfg)
 	} else {
-		ln, err = net.Listen("tcp", "127.0.0.1:0")
+		var lc net.ListenConfig
+		ln, err = lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	}
 	require.NoError(t, err)
 
@@ -58,7 +59,8 @@ func ftpTestServer(t *testing.T, srv *Server, tlsCfg *tls.Config, implicitTLS bo
 func ftpDial(t *testing.T, addr string) *textproto.Conn {
 	t.Helper()
 
-	conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
+	dialer := net.Dialer{Timeout: 2 * time.Second}
+	conn, err := dialer.DialContext(t.Context(), "tcp", addr)
 	require.NoError(t, err)
 	err = conn.SetDeadline(time.Now().Add(5 * time.Second))
 	require.NoError(t, err)
@@ -354,7 +356,8 @@ func TestFTPServer(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
+				dialer := net.Dialer{Timeout: 2 * time.Second}
+				conn, err := dialer.DialContext(t.Context(), "tcp", addr)
 				if !assert.NoError(t, err) {
 					return
 				}
@@ -409,7 +412,8 @@ func TestStartFTP(t *testing.T) {
 		srv.cfg.ListenIP = testListenIP
 
 		// Occupy a port
-		ln, err := net.Listen("tcp", testListenIP+":0")
+		var lc net.ListenConfig
+		ln, err := lc.Listen(t.Context(), "tcp", testListenIP+":0")
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = ln.Close() })
 
@@ -475,11 +479,11 @@ func TestFTPSServer(t *testing.T) {
 	tlsCfg := testTLSConfig(t)
 	addr := ftpTestServer(t, srv, tlsCfg, true)
 
-	conn, err := tls.DialWithDialer(
-		&net.Dialer{Timeout: 2 * time.Second},
-		"tcp", addr,
-		&tls.Config{InsecureSkipVerify: true},
-	)
+	dialer := tls.Dialer{
+		NetDialer: &net.Dialer{Timeout: 2 * time.Second},
+		Config:    &tls.Config{InsecureSkipVerify: true},
+	}
+	conn, err := dialer.DialContext(t.Context(), "tcp", addr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.Close() })
 
