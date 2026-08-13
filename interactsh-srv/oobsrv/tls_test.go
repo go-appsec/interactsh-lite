@@ -1,6 +1,7 @@
 package oobsrv
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -9,6 +10,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
+	"io/fs"
 	"log/slog"
 	"math/big"
 	"net"
@@ -17,6 +19,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/caddyserver/certmagic"
 
 	"github.com/libdns/libdns"
 	"github.com/stretchr/testify/assert"
@@ -299,6 +303,117 @@ func TestLatestModTime(t *testing.T) {
 
 		_, err := latestModTime(f, filepath.Join(dir, "missing.pem"))
 		assert.Error(t, err)
+	})
+}
+
+// writeTestCert writes a self-signed cert (valid for lifetime from now or notBeforeOffset) to the
+// given certmagic FileStorage under SiteCert(issuerKey, subject), returning its path.
+func writeTestCert(t *testing.T, store *certmagic.FileStorage, issuerKey, subject string, remaining time.Duration) string {
+	t.Helper()
+
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: subject},
+		NotBefore:    time.Now().Add(-90 * 24 * time.Hour), // ~90 day lifetime
+		NotAfter:     time.Now().Add(remaining),
+	}
+	certDER, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	require.NoError(t, err)
+
+	dir := filepath.Dir(store.Filename(certmagic.StorageKeys.SiteCert(issuerKey, subject)))
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	certPath := store.Filename(certmagic.StorageKeys.SiteCert(issuerKey, subject))
+	f, err := os.Create(certPath)
+	require.NoError(t, err)
+	require.NoError(t, pem.Encode(f, &pem.Block{Type: "CERTIFICATE", Bytes: certDER}))
+	require.NoError(t, f.Close())
+	return certPath
+}
+
+func TestCertEvictorCheckAndEvict(t *testing.T) {
+	t.Parallel()
+
+	const (
+		issuerKey    = "acme-test"
+		wildcardSubj = "*.test.example.com"
+	)
+	writeStored := func(t *testing.T, store *certmagic.FileStorage, subj string, remaining time.Duration) {
+		t.Helper()
+		writeTestCert(t, store, issuerKey, subj, remaining)
+	}
+
+	newEvictor := func(store *certmagic.FileStorage) *certEvictor {
+		srv := &Server{logger: testLogger(), acmeCache: certmagic.NewCache(certmagic.CacheOptions{
+			GetConfigForCert: func(_ certmagic.Certificate) (*certmagic.Config, error) { return nil, errors.New("unused") },
+		})}
+		return &certEvictor{s: srv, storage: store, subjects: []string{"test.example.com"}, logger: testLogger()}
+	}
+
+	t.Run("evicts_expired_cert", func(t *testing.T) {
+		store := &certmagic.FileStorage{Path: t.TempDir()}
+		subj := wildcardSubj
+		writeStored(t, store, subj, -time.Hour) // already expired
+
+		ok, err := newEvictor(store).checkAndEvict(context.Background(), issuerKey, subj)
+		require.NoError(t, err)
+		assert.True(t, ok)
+
+		_, err = store.Load(context.Background(), certmagic.StorageKeys.SiteCert(issuerKey, subj))
+		assert.ErrorIs(t, err, fs.ErrNotExist) // storage removed
+	})
+
+	t.Run("evicts_cert_within_window", func(t *testing.T) {
+		store := &certmagic.FileStorage{Path: t.TempDir()}
+		subj := wildcardSubj
+		// 90-day lifetime, ~5 days remaining => ratio ~0.05 < certExpiryWindow
+		writeStored(t, store, subj, 24*time.Hour)
+
+		ok, err := newEvictor(store).checkAndEvict(context.Background(), issuerKey, subj)
+		require.NoError(t, err)
+		assert.True(t, ok)
+
+		_, err = store.Load(context.Background(), certmagic.StorageKeys.SiteCert(issuerKey, subj))
+		assert.ErrorIs(t, err, fs.ErrNotExist)
+	})
+
+	t.Run("keeps_fresh_cert", func(t *testing.T) {
+		store := &certmagic.FileStorage{Path: t.TempDir()}
+		subj := wildcardSubj
+		// 90-day lifetime, ~80 days remaining => ratio ~0.89 > certExpiryWindow
+		writeStored(t, store, subj, 60*24*time.Hour)
+
+		ok, err := newEvictor(store).checkAndEvict(context.Background(), issuerKey, subj)
+		require.NoError(t, err)
+		assert.False(t, ok)
+
+		// cert still present
+		_, err = store.Load(context.Background(), certmagic.StorageKeys.SiteCert(issuerKey, subj))
+		require.NoError(t, err)
+	})
+
+	t.Run("skips_missing_cert", func(t *testing.T) {
+		store := &certmagic.FileStorage{Path: t.TempDir()}
+		ok, err := newEvictor(store).checkAndEvict(context.Background(), issuerKey, wildcardSubj)
+		require.NoError(t, err)
+		assert.False(t, ok)
+	})
+
+	t.Run("wildcard_subject_storage_path", func(t *testing.T) {
+		// Sanity: SiteCert path for a wildcard subject resolves under the site prefix we delete
+		store := &certmagic.FileStorage{Path: t.TempDir()}
+		subj := wildcardSubj
+		writeStored(t, store, subj, time.Hour)
+
+		certKey := certmagic.StorageKeys.SiteCert(issuerKey, subj)
+		prefix := certmagic.StorageKeys.CertsSitePrefix(issuerKey, subj)
+		assert.Contains(t, certKey, prefix+"/"+certmagic.StorageKeys.Safe(subj)+".crt")
+
+		require.NoError(t, store.Delete(context.Background(), prefix))
+		_, err := store.Load(context.Background(), certKey)
+		assert.ErrorIs(t, err, fs.ErrNotExist)
 	})
 }
 

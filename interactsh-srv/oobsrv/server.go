@@ -17,6 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/caddyserver/certmagic"
 	"github.com/go-appsec/interactsh-lite/oobclient"
 )
 
@@ -76,6 +77,8 @@ type Server struct {
 
 	// TLS
 	tlsConfig *tls.Config
+	acmeCfg   *certmagic.Config // ACME config backing tlsConfig (background renewal/eviction)
+	acmeCache *certmagic.Cache
 
 	// HTTP response caching (loaded at startup)
 	defaultHTTPResponse []byte // cached --default-http-response file content

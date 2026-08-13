@@ -7,8 +7,10 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"log/slog"
 	"math/big"
@@ -34,6 +36,12 @@ const certmagicStoragePath = ".local/share/certmagic"
 // ALPN list; non-h2 values are handled as HTTP/1.x by net/http, letting scanners
 // with legacy ALPN offers complete the handshake so we can capture the interaction.
 var serverNextProtos = []string{"h2", "http/1.1", "http/1.0", "spdy/3", "spdy/2", "spdy/1", "hq"}
+
+// certEvictInterval is how often the certificate evictor scans for expiring certs.
+const certEvictInterval = 2 * time.Hour
+
+// certExpiryWindow is the remaining lifetime fraction below which an ACME cert is evicted and re-issued.
+const certExpiryWindow = 1.0 / 4.0
 
 type tlsErrorFilterHandler struct {
 	slog.Handler
@@ -321,9 +329,28 @@ func (s *Server) provisionACME(ctx context.Context) (*tls.Config, error) {
 			zapcore.AddSync(os.Stderr), level),
 	})
 
-	cfg := certmagic.NewDefault()
-	cfg.Storage = storage
-	cfg.Logger = cmLogger
+	// Build a dedicated cache whose GetConfigForCert returns THIS configured cfg.
+	// certmagic's background maintenance loop renews managed certificates using the
+	// config returned by this callback; with NewDefault() it gets a fresh default
+	// config (default storage, HTTP-challenge-only issuer) that cannot renew our
+	// DNS-01 wildcard certs, so they were never refreshed once expiring.
+	s.acmeCfg = nil // reset in case provisionACME is retried
+	cache := certmagic.NewCache(certmagic.CacheOptions{
+		Logger: cmLogger,
+		GetConfigForCert: func(_ certmagic.Certificate) (*certmagic.Config, error) {
+			if s.acmeCfg == nil {
+				return nil, errors.New("ACME config not yet initialized")
+			}
+			return s.acmeCfg, nil
+		},
+	})
+	s.acmeCache = cache // keep reference so the evictor can drop cached certs on eviction
+
+	cfg := certmagic.New(cache, certmagic.Config{
+		Storage: storage,
+		Logger:  cmLogger,
+	})
+	s.acmeCfg = cfg // publish before ManageSync so background/eviction lookups resolve correctly
 
 	// Use the registerable domain (eTLD+1) for the ACME email
 	emailDomain := s.cfg.Domains[0]
@@ -374,6 +401,11 @@ func (s *Server) provisionACME(ctx context.Context) (*tls.Config, error) {
 		}
 		successCount++
 	}
+
+	// start the expiry-based cert evictor regardless of per-domain results; it only acts on stored certs
+	ev := newCertEvictor(s, storage)
+	_ = ev.Start()
+	s.addService(ev)
 
 	if successCount == 0 {
 		return nil, fmt.Errorf("all domains failed: %w", errors.Join(errs...))
@@ -464,4 +496,120 @@ func (c *certmagicFilterCore) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry)
 
 func (c *certmagicFilterCore) With(fields []zapcore.Field) zapcore.Core {
 	return &certmagicFilterCore{Core: c.Core.With(fields)}
+}
+
+// certEvictor periodically evicts expiring ACME certs so they get re-issued fresh.
+type certEvictor struct {
+	s        *Server
+	storage  certmagic.Storage
+	subjects []string // configured domains plus their wildcard forms
+	interval time.Duration
+	logger   *slog.Logger
+	done     chan struct{}
+}
+
+// Compiler check that certEvictor implements Service.
+var _ Service = (*certEvictor)(nil)
+
+func newCertEvictor(s *Server, storage certmagic.Storage) *certEvictor {
+	subjects := make([]string, 0, len(s.cfg.Domains)*2)
+	for _, d := range s.cfg.Domains {
+		subjects = append(subjects, d, "*."+d)
+	}
+	return &certEvictor{
+		s:        s,
+		storage:  storage,
+		subjects: subjects,
+		interval: certEvictInterval,
+		logger:   s.logger,
+		done:     make(chan struct{}),
+	}
+}
+
+func (e *certEvictor) Name() string { return "cert-evictor" }
+func (e *certEvictor) Start() error { go e.run(); return nil }
+func (e *certEvictor) Close() error { close(e.done); return nil }
+
+func (e *certEvictor) run() {
+	ticker := time.NewTicker(e.interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-e.done:
+			return
+		case <-ticker.C:
+			e.evictExpiring(context.Background())
+		}
+	}
+}
+
+// evictExpiring re-issues any cert that is expired or within certExpiryWindow of expiry.
+func (e *certEvictor) evictExpiring(ctx context.Context) {
+	cfg := e.s.acmeCfg
+	if cfg == nil || len(cfg.Issuers) == 0 {
+		return
+	}
+	issuerKey := cfg.Issuers[0].IssuerKey()
+
+	for _, subj := range e.subjects {
+		ok, err := e.checkAndEvict(ctx, issuerKey, subj)
+		if err != nil {
+			e.logger.Warn("certificate evictor could not load managed certificate", "subject", subj, "error", err)
+			continue
+		}
+		if !ok {
+			continue // not provisioned or still comfortably valid
+		}
+		e.logger.Warn("evicted expiring certificate; re-issuing fresh one", "subject", subj)
+		// re-issue immediately so the live TLS config serves a fresh cert without restarting
+		if err := cfg.ManageSync(ctx, []string{subj}); err != nil {
+			e.logger.Error("failed to re-issue certificate after eviction", "subject", subj, "error", err)
+		}
+	}
+}
+
+// checkAndEvict removes the stored cert for subject if it is expired or within certExpiryWindow of expiry.
+// Returns true when a cert was removed so the caller can re-issue it.
+func (e *certEvictor) checkAndEvict(ctx context.Context, issuerKey, subject string) (bool, error) {
+	leaf, err := e.loadLeaf(issuerKey, subject)
+	if errors.Is(err, fs.ErrNotExist) || leaf == nil {
+		return false, nil // not provisioned yet; ManageSync will obtain it
+	}
+	if err != nil {
+		return false, err
+	}
+	lifetime := leaf.NotAfter.Sub(leaf.NotBefore).Seconds()
+	if lifetime > 0 && time.Until(leaf.NotAfter).Seconds()/lifetime > certExpiryWindow {
+		return false, nil // comfortably valid; leave for certmagic's normal renewal
+	}
+	e.logger.Warn("evicting expiring certificate so it can be re-issued", "subject", subject, "expires_at", leaf.NotAfter)
+	if err := e.evictOne(ctx, issuerKey, subject); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// loadLeaf loads and parses the stored cert for subject.
+func (e *certEvictor) loadLeaf(issuerKey, subject string) (*x509.Certificate, error) {
+	pemBytes, err := e.storage.Load(context.Background(), certmagic.StorageKeys.SiteCert(issuerKey, subject))
+	if err != nil {
+		return nil, err
+	}
+	for len(pemBytes) > 0 {
+		block, rest := pem.Decode(pemBytes)
+		pemBytes = rest
+		if block == nil || block.Type != "CERTIFICATE" {
+			continue
+		}
+		return x509.ParseCertificate(block.Bytes)
+	}
+	return nil, fmt.Errorf("no certificate found for %s", subject)
+}
+
+// evictOne removes all cert assets for subject from storage and the in-memory cache.
+func (e *certEvictor) evictOne(ctx context.Context, issuerKey, subject string) error {
+	if e.s.acmeCache != nil {
+		e.s.acmeCache.RemoveManaged([]certmagic.SubjectIssuer{{Subject: subject, IssuerKey: issuerKey}})
+	}
+	return e.storage.Delete(ctx, certmagic.StorageKeys.CertsSitePrefix(issuerKey, subject))
 }
