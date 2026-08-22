@@ -11,7 +11,7 @@ require (
 	github.com/go-ldap/ldap/v3 v3.4.14
 	github.com/libdns/libdns v1.1.1
 	github.com/mackerelio/go-osstat v0.2.8
-	github.com/miekg/dns v1.1.72
+	github.com/miekg/dns v1.1.73
 	github.com/projectdiscovery/interactsh v1.3.1
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.12.1
@@ -143,12 +143,10 @@ require (
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b // indirect
-	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/oauth2 v0.31.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/term v0.45.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
-	golang.org/x/tools v0.48.0 // indirect
 	gopkg.in/corvus-ch/zbase32.v1 v1.0.0 // indirect
 )
