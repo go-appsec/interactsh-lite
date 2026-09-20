@@ -90,7 +90,7 @@ func TestOnHTTPInteraction(t *testing.T) {
 
 	t.Run("increments_http_count", func(t *testing.T) {
 		srv := testServerWithStorage(t)
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Host = testDomain
 
 		srv.onHTTPInteraction(req, "GET / HTTP/1.1\r\n", "HTTP/1.1 200 OK\r\n", "1.2.3.4", testDomain, testDomain)
@@ -104,7 +104,7 @@ func TestOnHTTPInteraction(t *testing.T) {
 		_, err := srv.storage.Register(t.Context(), testCorrelationID, pubKey, "secret", nil)
 		require.NoError(t, err)
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Host = testCorrelationID + testNonce + ".other.org"
 
 		srv.onHTTPInteraction(req, "req", "resp", "1.2.3.4", "", "")
@@ -121,7 +121,7 @@ func TestOnHTTPInteraction(t *testing.T) {
 		require.NoError(t, err)
 
 		host := testCorrelationID + testNonce + ".test.com"
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Host = host
 
 		rawReq := "GET / HTTP/1.1\r\nHost: " + host + "\r\n\r\n"
@@ -153,7 +153,7 @@ func TestOnHTTPInteraction(t *testing.T) {
 		require.NoError(t, err)
 
 		host := testCorrelationID + testNonce + ".test.com"
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Host = host
 		req.TLS = &tls.ConnectionState{}
 
@@ -178,7 +178,7 @@ func TestOnHTTPInteraction(t *testing.T) {
 		})
 
 		const host = "anything.test.com"
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Host = host
 
 		srv.onHTTPInteraction(req, "req", "resp", "10.0.0.1", host, testDomain)
@@ -206,7 +206,7 @@ func TestOnHTTPInteraction(t *testing.T) {
 		require.NoError(t, err)
 
 		// CID appears in request body, not the host
-		req := httptest.NewRequest(http.MethodPost, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/", nil)
 		req.Host = testDomain
 
 		rawReq := "POST / HTTP/1.1\r\nHost: test.com\r\n\r\nbody=" + testCorrelationID + testNonce
@@ -232,7 +232,7 @@ func TestOnHTTPInteraction(t *testing.T) {
 		require.NoError(t, err)
 
 		// Host does not match any configured domain, but CID is in raw request
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Host = "unknown.example.org"
 
 		rawReq := "GET / HTTP/1.1\r\nHost: unknown.example.org\r\n\r\n" + testCorrelationID + testNonce
@@ -255,7 +255,7 @@ func TestOnHTTPInteraction(t *testing.T) {
 		_, err := srv.storage.Register(t.Context(), testCorrelationID, pubKey, "secret", nil)
 		require.NoError(t, err)
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Host = testCorrelationID + testNonce + ".test.com:8080"
 
 		hostname := testCorrelationID + testNonce + ".test.com"
@@ -278,7 +278,7 @@ func TestOnHTTPInteraction(t *testing.T) {
 		// Two CIDs as separate labels in hostname
 		host := testCorrelationID + testNonce + "." + testCorrelationID2 + testNonce + "." + testDomain
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Host = host
 		srv.Handler().ServeHTTP(rec, req)
 
@@ -304,7 +304,7 @@ func TestServeDefault(t *testing.T) {
 		srv.defaultHTTPResponse = []byte("hello {DOMAIN}")
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Host = "sub.test.com"
 
 		srv.serveDefault(rec, req)
@@ -321,7 +321,7 @@ func TestServeDefault(t *testing.T) {
 		})
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/s/file.txt", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/s/file.txt", nil)
 		req.Host = testDomain
 
 		srv.serveDefault(rec, req)
@@ -337,7 +337,7 @@ func TestServeDefault(t *testing.T) {
 		})
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/s/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/s/", nil)
 		req.Host = testDomain
 
 		srv.serveDefault(rec, req)
@@ -352,7 +352,7 @@ func TestServeDefault(t *testing.T) {
 		})
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/s/../../../etc/passwd", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/s/../../../etc/passwd", nil)
 		req.Host = testDomain
 
 		srv.serveDefault(rec, req)
@@ -370,7 +370,7 @@ func TestServeDefault(t *testing.T) {
 		})
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/s/sub", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/s/sub", nil)
 		req.Host = testDomain
 
 		srv.serveDefault(rec, req)
@@ -388,7 +388,7 @@ func TestServeDefault(t *testing.T) {
 		})
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/s/file.txt?header=X-Custom:test-val", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/s/file.txt?header=X-Custom:test-val", nil)
 		req.Host = testDomain
 
 		srv.serveDefault(rec, req)
@@ -408,7 +408,7 @@ func TestServeDefault(t *testing.T) {
 		})
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/s/file.txt?body=override", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/s/file.txt?body=override", nil)
 		req.Host = testDomain
 
 		srv.serveDefault(rec, req)
@@ -420,7 +420,7 @@ func TestServeDefault(t *testing.T) {
 		srv := testServerWithStorage(t)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Host = testDomain
 
 		srv.serveDefault(rec, req)
@@ -436,7 +436,7 @@ func TestServeDefault(t *testing.T) {
 		srv.httpIndex = []byte("welcome to {DOMAIN}")
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Host = "sub.test.com"
 
 		srv.serveDefault(rec, req)
@@ -451,7 +451,7 @@ func TestServeDefault(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Host = testCorrelationID + testNonce + ".test.com"
 
 		srv.serveDefault(rec, req)
@@ -465,7 +465,7 @@ func TestServeDefault(t *testing.T) {
 		srv := testServerWithStorage(t)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/data.xml", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/data.xml", nil)
 		req.Host = testDomain
 
 		srv.serveDefault(rec, req)
@@ -484,7 +484,7 @@ func TestServeDefault(t *testing.T) {
 		host := cid + testNonce + "." + testDomain
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/test?body=hello+world", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test?body=hello+world", nil)
 		req.Host = host
 
 		srv.serveDefault(rec, req)
@@ -503,7 +503,7 @@ func TestServeDefault(t *testing.T) {
 
 		encoded := base64.StdEncoding.EncodeToString([]byte("decoded content"))
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/test?b64_body="+encoded, nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test?b64_body="+encoded, nil)
 		req.Host = host
 
 		srv.serveDefault(rec, req)
@@ -522,7 +522,7 @@ func TestServeDefault(t *testing.T) {
 
 		encoded := base64.StdEncoding.EncodeToString([]byte("path body"))
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/b64_body:"+encoded+"/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/b64_body:"+encoded+"/", nil)
 		req.Host = host
 
 		srv.serveDefault(rec, req)
@@ -540,7 +540,7 @@ func TestServeDefault(t *testing.T) {
 		host := cid + testNonce + "." + testDomain
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/test?header=X-Foo:bar&body=ok", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test?header=X-Foo:bar&body=ok", nil)
 		req.Host = host
 
 		srv.serveDefault(rec, req)
@@ -559,14 +559,14 @@ func TestServeDefault(t *testing.T) {
 
 		// Valid status code
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/test?status=201&body=created", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test?status=201&body=created", nil)
 		req.Host = host
 		srv.serveDefault(rec, req)
 		assert.Equal(t, 201, rec.Code)
 
 		// Invalid status code falls back to 200
 		rec = httptest.NewRecorder()
-		req = httptest.NewRequest(http.MethodGet, "/test?status=abc&body=ok", nil)
+		req = httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test?status=abc&body=ok", nil)
 		req.Host = host
 		srv.serveDefault(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -574,7 +574,7 @@ func TestServeDefault(t *testing.T) {
 		// Positive out-of-range codes clamp to [100,999]; non-positive fall back to 200
 		for status, want := range map[string]int{"-5": http.StatusOK, "0": http.StatusOK, "1": 100, "1000": 999} {
 			rec = httptest.NewRecorder()
-			req = httptest.NewRequest(http.MethodGet, "/test?status="+status+"&body=ok", nil)
+			req = httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test?status="+status+"&body=ok", nil)
 			req.Host = host
 			srv.serveDefault(rec, req)
 			assert.Equal(t, want, rec.Code, "status=%s", status)
@@ -590,7 +590,7 @@ func TestServeDefault(t *testing.T) {
 		cid := registerTestSession(t, srv)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/test?b64_body=!!invalid!!", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test?b64_body=!!invalid!!", nil)
 		req.Host = cid + testNonce + "." + testDomain
 
 		srv.serveDefault(rec, req)
@@ -604,7 +604,7 @@ func TestServeDefault(t *testing.T) {
 		// DynamicResp is false by default
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/test?body=should-not-appear", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test?body=should-not-appear", nil)
 		req.Host = testDomain
 
 		srv.serveDefault(rec, req)
@@ -620,7 +620,7 @@ func TestServeDefault(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/somepath", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/somepath", nil)
 		req.Host = testCorrelationID + testNonce + ".test.com"
 
 		srv.serveDefault(rec, req)
@@ -637,7 +637,7 @@ func TestServeDefault(t *testing.T) {
 		srv := testServerWithStorage(t)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/somepath", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/somepath", nil)
 		req.Host = testDomain
 
 		srv.serveDefault(rec, req)
@@ -653,7 +653,7 @@ func TestServeDefault(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/robots.txt", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/robots.txt", nil)
 		req.Host = testCorrelationID + testNonce + ".test.com"
 
 		srv.serveDefault(rec, req)
@@ -676,7 +676,7 @@ func TestServeDefault(t *testing.T) {
 		host := cid + testNonce + "." + testDomain
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/test?header=X-A:1&header=X-B:2&body=ok", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test?header=X-A:1&header=X-B:2&body=ok", nil)
 		req.Host = host
 
 		srv.serveDefault(rec, req)
@@ -694,7 +694,7 @@ func TestServeDefault(t *testing.T) {
 		cid := registerTestSession(t, srv)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/test?header=nocolon&header=X-Good:ok&body=x", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test?header=nocolon&header=X-Good:ok&body=x", nil)
 		req.Host = cid + testNonce + "." + testDomain
 
 		srv.serveDefault(rec, req)
@@ -714,7 +714,7 @@ func TestServeDefault(t *testing.T) {
 
 		encoded := base64.StdEncoding.EncodeToString([]byte("path wins"))
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/b64_body:"+encoded+"/?body=query+loses", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/b64_body:"+encoded+"/?body=query+loses", nil)
 		req.Host = host
 
 		srv.serveDefault(rec, req)
@@ -731,7 +731,7 @@ func TestServeDefault(t *testing.T) {
 		cid := registerTestSession(t, srv)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/b64_body:!!!invalid/?body=fallback", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/b64_body:!!!invalid/?body=fallback", nil)
 		req.Host = cid + testNonce + "." + testDomain
 
 		srv.serveDefault(rec, req)
@@ -746,7 +746,7 @@ func TestServeDefault(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/data.json", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/data.json", nil)
 		req.Host = testCorrelationID + testNonce + ".test.com"
 
 		srv.serveDefault(rec, req)
@@ -762,7 +762,7 @@ func TestServeDefault(t *testing.T) {
 		srv := testServerWithStorage(t)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/test.json", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test.json", nil)
 		req.Host = "unknown." + testDomain
 		srv.Handler().ServeHTTP(rec, req)
 
@@ -778,7 +778,7 @@ func TestServeDefault(t *testing.T) {
 		})
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/robots.txt?status=404&body=override", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/robots.txt?status=404&body=override", nil)
 		req.Host = testDomain
 
 		srv.serveDefault(rec, req)
@@ -797,7 +797,7 @@ func TestServeDefault(t *testing.T) {
 		cid := registerTestSession(t, srv)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/test?delay=0&body=delayed", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test?delay=0&body=delayed", nil)
 		req.Host = cid + testNonce + "." + testDomain
 
 		srv.serveDefault(rec, req)
@@ -813,7 +813,7 @@ func TestServeDefault(t *testing.T) {
 		})
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/s/missing.txt", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/s/missing.txt", nil)
 		req.Host = testDomain
 
 		srv.serveDefault(rec, req)
@@ -830,7 +830,7 @@ func TestServeDefault(t *testing.T) {
 		})
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/s/.hidden", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/s/.hidden", nil)
 		req.Host = "sub." + testDomain
 		srv.Handler().ServeHTTP(rec, req)
 
@@ -850,7 +850,7 @@ func TestServeDefault(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Host = testCorrelationID + testNonce + ".test.com"
 		srv.serveDefault(rec, req)
 
@@ -875,7 +875,7 @@ func TestServeDefault(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/somepath", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/somepath", nil)
 		req.Host = testCorrelationID + testNonce + ".test.com"
 		srv.serveDefault(rec, req)
 
@@ -897,7 +897,7 @@ func TestServeDefault(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/?status=201&header=X-Source:param&body=param+body", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/?status=201&header=X-Source:param&body=param+body", nil)
 		req.Host = testCorrelationID + testNonce + ".test.com"
 		srv.serveDefault(rec, req)
 
@@ -915,7 +915,7 @@ func TestServeDefault(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/?status=302&header=Location:https://target.com", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/?status=302&header=Location:https://target.com", nil)
 		req.Host = testCorrelationID + testNonce + ".test.com"
 		srv.serveDefault(rec, req)
 
@@ -932,7 +932,7 @@ func TestServeDefault(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/test?status=200&header=Content-Type:text/plain&body=hello", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test?status=200&header=Content-Type:text/plain&body=hello", nil)
 		req.Host = testCorrelationID + testNonce + ".test.com"
 		srv.serveDefault(rec, req)
 
@@ -953,7 +953,7 @@ func TestServeDefault(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Host = testCorrelationID + testNonce + ".test.com"
 		srv.serveDefault(rec, req)
 
@@ -973,7 +973,7 @@ func TestServeDefault(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Host = testCorrelationID + testNonce + ".test.com"
 		srv.serveDefault(rec, req)
 
@@ -993,7 +993,7 @@ func TestServeDefault(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Host = testCorrelationID + testNonce + ".test.com"
 		req.TLS = &tls.ConnectionState{}
 		srv.serveDefault(rec, req)
@@ -1014,7 +1014,7 @@ func TestServeDefault(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Host = testCorrelationID + testNonce + ".test.com"
 		srv.serveDefault(rec, req)
 
@@ -1029,7 +1029,7 @@ func TestServeDefault(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/somepath", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/somepath", nil)
 		req.Host = testCorrelationID + testNonce + ".test.com"
 		srv.serveDefault(rec, req)
 
@@ -1045,7 +1045,7 @@ func TestServeDefault(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/?status=302&header=Location:https://target.com&body=evil", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/?status=302&header=Location:https://target.com&body=evil", nil)
 		req.Host = testCorrelationID + testNonce + ".test.com"
 		srv.serveDefault(rec, req)
 
@@ -1063,7 +1063,7 @@ func TestServeDefault(t *testing.T) {
 
 		encoded := base64.StdEncoding.EncodeToString([]byte("evil"))
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/?status=302&header=Location:https://target.com&b64_body="+encoded, nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/?status=302&header=Location:https://target.com&b64_body="+encoded, nil)
 		req.Host = testCorrelationID + testNonce + ".test.com"
 		srv.serveDefault(rec, req)
 
@@ -1080,7 +1080,7 @@ func TestServeDefault(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/?delay=0", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/?delay=0", nil)
 		req.Host = testCorrelationID + testNonce + ".test.com"
 		srv.serveDefault(rec, req)
 
@@ -1098,7 +1098,7 @@ func TestServeDefault(t *testing.T) {
 		cid := registerTestSession(t, srv)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/test?header=Set-Cookie:a=1&header=Set-Cookie:b=2&body=ok", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test?header=Set-Cookie:a=1&header=Set-Cookie:b=2&body=ok", nil)
 		req.Host = cid + testNonce + "." + testDomain
 		srv.serveDefault(rec, req)
 
@@ -1123,7 +1123,7 @@ func TestServeDefault(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Host = testCorrelationID + testNonce + ".test.com"
 		srv.serveDefault(rec, req)
 
@@ -1160,7 +1160,7 @@ func TestServeDefault(t *testing.T) {
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
 				rec := httptest.NewRecorder()
-				req := httptest.NewRequest(http.MethodGet, "/?status="+tc.status+"&header=Location:"+tc.location, nil)
+				req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/?status="+tc.status+"&header=Location:"+tc.location, nil)
 				req.Host = testCorrelationID + testNonce + ".test.com"
 				if tc.tls {
 					req.TLS = &tls.ConnectionState{}
@@ -1184,7 +1184,7 @@ func TestServeDefault(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/?status=200&header=Location:target.com&body=ok", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/?status=200&header=Location:target.com&body=ok", nil)
 		req.Host = testCorrelationID + testNonce + ".test.com"
 		srv.serveDefault(rec, req)
 

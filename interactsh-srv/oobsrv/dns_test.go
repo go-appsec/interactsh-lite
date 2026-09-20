@@ -998,7 +998,7 @@ func TestStartDNS(t *testing.T) {
 		srv.ips = ServerIPs{IPv4: []net.IP{net.ParseIP("1.2.3.4").To4()}}
 
 		initialCount := len(srv.services)
-		require.NoError(t, srv.startDNS())
+		require.NoError(t, srv.startDNS(t.Context()))
 		// Should have added at least UDP service (TCP may also succeed)
 		assert.Greater(t, len(srv.services), initialCount)
 		assert.Equal(t, "DNS-UDP", srv.services[initialCount].Name())
@@ -1030,7 +1030,7 @@ func TestStartDNS(t *testing.T) {
 		srv.ips = ServerIPs{IPv4: []net.IP{net.ParseIP("1.2.3.4").To4()}}
 
 		initialCount := len(srv.services)
-		require.NoError(t, srv.startDNS())
+		require.NoError(t, srv.startDNS(t.Context()))
 
 		// UDP should succeed, TCP should have failed silently
 		udpAdded := len(srv.services) - initialCount

@@ -37,8 +37,8 @@ const (
 type Service interface {
 	// Name returns the service identifier for logging.
 	Name() string
-	// Start begins listening. Returns an error if binding fails.
-	Start() error
+	// Start begins listening, inheriting cancellation from ctx. Returns an error if binding fails.
+	Start(ctx context.Context) error
 	// Close shuts down the service and releases bound ports.
 	Close() error
 }
@@ -189,16 +189,16 @@ func (s *Server) Handler() http.Handler {
 // Start runs the service startup sequence in dependency order.
 func (s *Server) Start(ctx context.Context) error {
 	if s.cfg.EnablePprof {
-		if err := s.startPprof(); err != nil {
+		if err := s.startPprof(ctx); err != nil {
 			return fmt.Errorf("pprof: %w", err)
 		}
 	}
 
-	if err := s.resolveIPs(); err != nil {
+	if err := s.resolveIPs(ctx); err != nil {
 		return fmt.Errorf("ip resolution: %w", err)
 	}
 
-	if err := s.startDNS(); err != nil {
+	if err := s.startDNS(ctx); err != nil {
 		return err
 	}
 
@@ -208,7 +208,7 @@ func (s *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("http files: %w", err)
 	}
 
-	if err := s.startHTTP(); err != nil {
+	if err := s.startHTTP(ctx); err != nil {
 		return err
 	}
 
@@ -217,25 +217,25 @@ func (s *Server) Start(ctx context.Context) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := s.startHTTPS(); err != nil {
+		if err := s.startHTTPS(ctx); err != nil {
 			s.logger.Warn("HTTPS start failed, skipping", "error", err)
 		}
 	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		s.startSMTP()
+		s.startSMTP(ctx)
 	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		s.startLDAP()
+		s.startLDAP(ctx)
 	}()
 	if s.cfg.FTP {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			s.startFTP()
+			s.startFTP(ctx)
 		}()
 	}
 	wg.Wait()
@@ -367,9 +367,9 @@ func newPprofService(logger *slog.Logger) *pprofService {
 
 func (p *pprofService) Name() string { return "pprof" }
 
-func (p *pprofService) Start() error {
+func (p *pprofService) Start(ctx context.Context) error {
 	var lc net.ListenConfig
-	ln, err := lc.Listen(context.Background(), "tcp", p.server.Addr)
+	ln, err := lc.Listen(ctx, "tcp", p.server.Addr)
 	if err != nil {
 		return err
 	}
@@ -384,9 +384,9 @@ func (p *pprofService) Close() error {
 	return p.server.Close()
 }
 
-func (s *Server) startPprof() error {
+func (s *Server) startPprof(ctx context.Context) error {
 	svc := newPprofService(s.logger)
-	if err := svc.Start(); err != nil {
+	if err := svc.Start(ctx); err != nil {
 		return err
 	}
 	s.addService(svc)

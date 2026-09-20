@@ -100,7 +100,7 @@ func TestHandleRegister(t *testing.T) {
 
 		body := registerJSON(t, &key.PublicKey, testCorrelationID, "secret-123")
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -119,7 +119,7 @@ func TestHandleRegister(t *testing.T) {
 
 		body := registerJSON(t, &key.PublicKey, "tooshort", "secret-123")
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -136,7 +136,7 @@ func TestHandleRegister(t *testing.T) {
 		const longID = "abcdefghijklmnopqrstuvwxyz123456"
 		body := registerJSON(t, &key.PublicKey, longID, "secret-123")
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -150,12 +150,12 @@ func TestHandleRegister(t *testing.T) {
 		body := registerJSON(t, &key.PublicKey, testCorrelationID, "secret-123")
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)
 
 		rec = httptest.NewRecorder()
-		req = httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+		req = httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)
 
@@ -169,13 +169,13 @@ func TestHandleRegister(t *testing.T) {
 
 		body1 := registerJSON(t, &key.PublicKey, testCorrelationID, "secret-1")
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body1))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(body1))
 		srv.Handler().ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)
 
 		body2 := registerJSON(t, &key.PublicKey, testCorrelationID, "secret-2")
 		rec = httptest.NewRecorder()
-		req = httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body2))
+		req = httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(body2))
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -188,7 +188,7 @@ func TestHandleRegister(t *testing.T) {
 		srv := testServerWithStorage(t)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader("{bad json"))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", strings.NewReader("{bad json"))
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -203,7 +203,7 @@ func TestHandleRegister(t *testing.T) {
 
 		body := registerJSON(t, &key.PublicKey, testCorrelationID, "")
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -222,7 +222,7 @@ func TestHandleRegister(t *testing.T) {
 		})
 		require.NoError(t, err)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -238,7 +238,7 @@ func TestHandleRegister(t *testing.T) {
 			key := sharedRSAKey
 			body := registerJSON(t, &key.PublicKey, id, "secret")
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(body))
 			srv.Handler().ServeHTTP(rec, req)
 			assert.Equal(t, http.StatusOK, rec.Code)
 			assert.Equal(t, uint64(i+1), srv.storage.SessionCount())
@@ -263,7 +263,7 @@ func TestHandleRegister(t *testing.T) {
 				defer wg.Done()
 
 				rec := httptest.NewRecorder()
-				req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(bodies[i]))
+				req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(bodies[i]))
 				srv.Handler().ServeHTTP(rec, req)
 				assert.Equal(t, http.StatusOK, rec.Code)
 			}()
@@ -295,7 +295,7 @@ func TestHandleRegister(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(body))
 		req.Header.Set("Authorization", testToken)
 		srv.Handler().ServeHTTP(rec, req)
 
@@ -321,7 +321,7 @@ func TestHandleRegister(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -346,7 +346,7 @@ func TestHandleRegister(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -372,7 +372,7 @@ func TestHandleRegister(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -404,7 +404,7 @@ func TestHandlePoll(t *testing.T) {
 		require.NoError(t, srv.storage.AppendInteraction(testCorrelationID, data))
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -432,7 +432,7 @@ func TestHandlePoll(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -453,7 +453,7 @@ func TestHandlePoll(t *testing.T) {
 		require.NoError(t, srv.storage.AppendInteraction(testCorrelationID, []byte(`{"protocol":"dns"}`)))
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
 		srv.Handler().ServeHTTP(rec, req)
 
 		var resp1 pollResponse
@@ -461,7 +461,7 @@ func TestHandlePoll(t *testing.T) {
 		assert.Len(t, resp1.Data, 1)
 
 		rec = httptest.NewRecorder()
-		req = httptest.NewRequest(http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
+		req = httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
 		srv.Handler().ServeHTTP(rec, req)
 
 		var resp2 pollResponse
@@ -483,7 +483,7 @@ func TestHandlePoll(t *testing.T) {
 		}
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
 		srv.Handler().ServeHTTP(rec, req)
 
 		var resp pollResponse
@@ -502,7 +502,7 @@ func TestHandlePoll(t *testing.T) {
 		srv := testServerWithStorage(t)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/poll?id=nonexistent0000000000&secret=s", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id=nonexistent0000000000&secret=s", nil)
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -519,7 +519,7 @@ func TestHandlePoll(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/poll?id="+testCorrelationID+"&secret=wrong", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+testCorrelationID+"&secret=wrong", nil)
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -536,7 +536,7 @@ func TestHandlePoll(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/poll?id="+testCorrelationID+"extrachars&secret=secret", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+testCorrelationID+"extrachars&secret=secret", nil)
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -550,7 +550,7 @@ func TestHandlePoll(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
 		srv.Handler().ServeHTTP(rec, req)
 
 		var raw map[string]json.RawMessage
@@ -581,7 +581,7 @@ func TestHandlePoll(t *testing.T) {
 		srv.tldBuckets["test.com"].Append([]byte(`{"protocol":"dns"}`))
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
 		req.Header.Set("Authorization", "tok")
 		srv.Handler().ServeHTTP(rec, req)
 
@@ -610,7 +610,7 @@ func TestHandlePoll(t *testing.T) {
 		srv.tldBuckets["b.com"].Append([]byte(`{"domain":"b.com"}`))
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
 		req.Header.Set("Authorization", "tok")
 		srv.Handler().ServeHTTP(rec, req)
 
@@ -642,7 +642,7 @@ func TestHandlePoll(t *testing.T) {
 		srv.tldBuckets["test.com"].Append([]byte(`{"protocol":"http","unique-id":"shared1"}`))
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/poll?id="+id1+"&secret=s1", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+id1+"&secret=s1", nil)
 		req.Header.Set("Authorization", "tok")
 		srv.Handler().ServeHTTP(rec, req)
 		var resp1 pollResponse
@@ -650,7 +650,7 @@ func TestHandlePoll(t *testing.T) {
 		assert.Len(t, resp1.TLDData, 1)
 
 		rec = httptest.NewRecorder()
-		req = httptest.NewRequest(http.MethodGet, "/poll?id="+id2+"&secret=s2", nil)
+		req = httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+id2+"&secret=s2", nil)
 		req.Header.Set("Authorization", "tok")
 		srv.Handler().ServeHTTP(rec, req)
 		var resp2 pollResponse
@@ -663,7 +663,7 @@ func TestHandlePoll(t *testing.T) {
 			id, secret string
 		}{{id1, "s1"}, {id2, "s2"}} {
 			rec = httptest.NewRecorder()
-			req = httptest.NewRequest(http.MethodGet, "/poll?id="+pair.id+"&secret="+pair.secret, nil)
+			req = httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+pair.id+"&secret="+pair.secret, nil)
 			req.Header.Set("Authorization", "tok")
 			srv.Handler().ServeHTTP(rec, req)
 			var resp pollResponse
@@ -679,7 +679,7 @@ func TestHandlePoll(t *testing.T) {
 
 		body := registerJSON(t, &key.PublicKey, testCorrelationID, "secret")
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(rec, req)
 		require.Equal(t, http.StatusOK, rec.Code)
 
@@ -687,7 +687,7 @@ func TestHandlePoll(t *testing.T) {
 		err := srv.storage.AppendInteraction(testCorrelationID, []byte(`{"protocol":"http"}`))
 		require.NoError(t, err)
 		rec1 := httptest.NewRecorder()
-		req1 := httptest.NewRequest(http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
+		req1 := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
 		srv.Handler().ServeHTTP(rec1, req1)
 		require.Equal(t, http.StatusOK, rec1.Code)
 
@@ -697,7 +697,7 @@ func TestHandlePoll(t *testing.T) {
 		err = srv.storage.AppendInteraction(testCorrelationID, []byte(`{"protocol":"dns"}`))
 		require.NoError(t, err)
 		rec2 := httptest.NewRecorder()
-		req2 := httptest.NewRequest(http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
+		req2 := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
 		srv.Handler().ServeHTTP(rec2, req2)
 		require.Equal(t, http.StatusOK, rec2.Code)
 
@@ -716,7 +716,7 @@ func TestHandlePoll(t *testing.T) {
 		srv := testServerWithStorage(t)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/poll?id=tooshort&secret=s", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id=tooshort&secret=s", nil)
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -731,13 +731,13 @@ func TestHandlePoll(t *testing.T) {
 
 		body := registerJSON(t, &key.PublicKey, testCorrelationID, "mysecret")
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(rec, req)
 		require.Equal(t, http.StatusOK, rec.Code)
 
 		// Poll with empty secret
 		rec2 := httptest.NewRecorder()
-		req2 := httptest.NewRequest(http.MethodGet, "/poll?id="+testCorrelationID+"&secret=", nil)
+		req2 := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+testCorrelationID+"&secret=", nil)
 		srv.Handler().ServeHTTP(rec2, req2)
 		assert.Equal(t, http.StatusBadRequest, rec2.Code)
 	})
@@ -755,7 +755,7 @@ func TestHandleDeregister(t *testing.T) {
 
 		body := deregisterJSON(testCorrelationID, "secret")
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/deregister", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/deregister", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -770,7 +770,7 @@ func TestHandleDeregister(t *testing.T) {
 
 		body := deregisterJSON("nonexistent0000000000", "secret")
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/deregister", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/deregister", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -788,7 +788,7 @@ func TestHandleDeregister(t *testing.T) {
 
 		body := deregisterJSON(testCorrelationID, "wrong")
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/deregister", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/deregister", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -807,7 +807,7 @@ func TestHandleDeregister(t *testing.T) {
 
 		body := deregisterJSON(testCorrelationID, "secret")
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/deregister", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/deregister", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)
 
@@ -824,7 +824,7 @@ func TestHandleDeregister(t *testing.T) {
 
 		body := deregisterJSON(testCorrelationID+"extrachars", "secret")
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/deregister", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/deregister", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -835,7 +835,7 @@ func TestHandleDeregister(t *testing.T) {
 		srv := testServerWithStorage(t)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/deregister", strings.NewReader("not json"))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/deregister", strings.NewReader("not json"))
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -849,7 +849,7 @@ func TestHandleDeregister(t *testing.T) {
 
 		body := deregisterJSON("tooshort", "secret")
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/deregister", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/deregister", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -864,20 +864,20 @@ func TestHandleDeregister(t *testing.T) {
 
 		regBody := registerJSON(t, &key.PublicKey, testCorrelationID, "secret")
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(regBody))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(regBody))
 		srv.Handler().ServeHTTP(rec, req)
 		require.Equal(t, http.StatusOK, rec.Code)
 
 		// First deregister succeeds
 		deregBody := deregisterJSON(testCorrelationID, "secret")
 		rec2 := httptest.NewRecorder()
-		req2 := httptest.NewRequest(http.MethodPost, "/deregister", bytes.NewReader(deregBody))
+		req2 := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/deregister", bytes.NewReader(deregBody))
 		srv.Handler().ServeHTTP(rec2, req2)
 		assert.Equal(t, http.StatusOK, rec2.Code)
 
 		// Second deregister fails
 		rec3 := httptest.NewRecorder()
-		req3 := httptest.NewRequest(http.MethodPost, "/deregister", bytes.NewReader(deregBody))
+		req3 := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/deregister", bytes.NewReader(deregBody))
 		srv.Handler().ServeHTTP(rec3, req3)
 		assert.Equal(t, http.StatusBadRequest, rec3.Code)
 
@@ -896,7 +896,7 @@ func TestEndToEndLifecycle(t *testing.T) {
 	// 1. Register
 	regBody := registerJSON(t, &key.PublicKey, testCorrelationID, "my-secret")
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(regBody))
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(regBody))
 	srv.Handler().ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
 
@@ -916,7 +916,7 @@ func TestEndToEndLifecycle(t *testing.T) {
 
 	// 3. Poll - decrypt and verify
 	rec = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/poll?id="+testCorrelationID+"&secret=my-secret", nil)
+	req = httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+testCorrelationID+"&secret=my-secret", nil)
 	srv.Handler().ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
 
@@ -933,7 +933,7 @@ func TestEndToEndLifecycle(t *testing.T) {
 
 	// 4. Poll again - empty
 	rec = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/poll?id="+testCorrelationID+"&secret=my-secret", nil)
+	req = httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+testCorrelationID+"&secret=my-secret", nil)
 	srv.Handler().ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
 
@@ -944,13 +944,13 @@ func TestEndToEndLifecycle(t *testing.T) {
 	// 5. Deregister
 	deregBody := deregisterJSON(testCorrelationID, "my-secret")
 	rec = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/deregister", bytes.NewReader(deregBody))
+	req = httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/deregister", bytes.NewReader(deregBody))
 	srv.Handler().ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	// 6. Poll after deregister - error
 	rec = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/poll?id="+testCorrelationID+"&secret=my-secret", nil)
+	req = httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+testCorrelationID+"&secret=my-secret", nil)
 	srv.Handler().ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
@@ -968,7 +968,7 @@ func TestEndpointsAuthIntegration(t *testing.T) {
 
 	t.Run("correct_token_passes", func(t *testing.T) {
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(regBody))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(regBody))
 		req.Header.Set("Authorization", "valid-token")
 		srv.Handler().ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -977,7 +977,7 @@ func TestEndpointsAuthIntegration(t *testing.T) {
 	t.Run("unauthorized_requests", func(t *testing.T) {
 		// Wrong token
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(regBody))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(regBody))
 		req.Header.Set("Authorization", "wrong-token")
 		srv.Handler().ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
@@ -985,14 +985,14 @@ func TestEndpointsAuthIntegration(t *testing.T) {
 
 		// Missing token
 		rec = httptest.NewRecorder()
-		req = httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(regBody))
+		req = httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/register", bytes.NewReader(regBody))
 		srv.Handler().ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
 	})
 
 	t.Run("poll_requires_auth", func(t *testing.T) {
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/poll?id="+testCorrelationID+"&secret=secret", nil)
 		srv.Handler().ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
 	})
@@ -1000,14 +1000,14 @@ func TestEndpointsAuthIntegration(t *testing.T) {
 	t.Run("deregister_requires_auth", func(t *testing.T) {
 		body := deregisterJSON(testCorrelationID, "secret")
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/deregister", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/deregister", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
 	})
 
 	t.Run("default_route_no_auth", func(t *testing.T) {
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Host = "test.com"
 		srv.Handler().ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)

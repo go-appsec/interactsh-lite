@@ -208,7 +208,7 @@ func New(ctx context.Context, opts ...Options) (*Client, error) {
 	}
 
 	if client.keepAliveInterval > 0 {
-		client.startKeepAlive()
+		client.startKeepAlive(ctx)
 	}
 
 	return client, nil
@@ -329,8 +329,8 @@ func (c *Client) performRegistration(ctx context.Context, serverURL *url.URL) er
 }
 
 // startKeepAlive starts a goroutine that periodically re-registers.
-func (c *Client) startKeepAlive() {
-	ctx, cancel := context.WithCancel(context.Background())
+func (c *Client) startKeepAlive(ctx context.Context) { // TODO - update in next major version
+	ctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	c.keepAliveCancel = cancel
 
 	go func() {
@@ -350,7 +350,7 @@ func (c *Client) startKeepAlive() {
 				c.mu.RUnlock()
 
 				// Silently attempt re-registration
-				_ = c.performRegistration(context.Background(), c.serverURL)
+				_ = c.performRegistration(ctx, c.serverURL)
 			}
 		}
 	}()
@@ -793,7 +793,7 @@ func LoadSession(ctx context.Context, path string, opts ...Options) (*Client, er
 	}
 
 	if client.keepAliveInterval > 0 {
-		client.startKeepAlive()
+		client.startKeepAlive(ctx)
 	}
 
 	return client, nil

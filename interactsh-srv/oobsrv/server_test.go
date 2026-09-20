@@ -1,6 +1,7 @@
 package oobsrv
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -61,7 +62,7 @@ func TestHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/foo", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/foo", nil)
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -78,7 +79,7 @@ func TestHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, "custom-srv", rec.Header().Get("Server"))
@@ -91,7 +92,7 @@ func TestHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Empty(t, rec.Header().Get("X-Interactsh-Version"))
@@ -330,8 +331,8 @@ type mockService struct {
 	onClose func()
 }
 
-func (m *mockService) Name() string { return m.name }
-func (m *mockService) Start() error { return nil }
+func (m *mockService) Name() string                    { return m.name }
+func (m *mockService) Start(ctx context.Context) error { return nil }
 func (m *mockService) Close() error {
 	if m.onClose != nil {
 		m.onClose()

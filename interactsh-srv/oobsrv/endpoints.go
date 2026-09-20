@@ -9,6 +9,9 @@ import (
 	"github.com/go-appsec/interactsh-lite/oobclient"
 )
 
+// jsonErrorKey is the JSON field key for error responses.
+const jsonErrorKey = "error"
+
 // registerRequest is the POST /register JSON body.
 type registerRequest struct {
 	PublicKey     string                    `json:"public-key"`
@@ -48,21 +51,21 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	var req registerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": fmt.Sprintf("could not decode json body: %v", err),
+			jsonErrorKey: fmt.Sprintf("could not decode json body: %v", err),
 		})
 		return
 	}
 
 	if req.SecretKey == "" {
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": "secret-key must not be empty",
+			jsonErrorKey: "secret-key must not be empty",
 		})
 		return
 	}
 
 	if len(req.CorrelationID) < s.cfg.CorrelationIdLength {
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": fmt.Sprintf("correlation-id must be at least %d characters", s.cfg.CorrelationIdLength),
+			jsonErrorKey: fmt.Sprintf("correlation-id must be at least %d characters", s.cfg.CorrelationIdLength),
 		})
 		return
 	}
@@ -72,7 +75,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	if !isCIDBase32(req.CorrelationID) {
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": "correlation-id contains invalid characters",
+			jsonErrorKey: "correlation-id contains invalid characters",
 		})
 		return
 	}
@@ -80,7 +83,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	pubKey, err := ParsePublicKey(req.PublicKey)
 	if err != nil {
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": fmt.Sprintf("could not decode public key: %v", err),
+			jsonErrorKey: fmt.Sprintf("could not decode public key: %v", err),
 		})
 		return
 	}
@@ -88,12 +91,12 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if req.Response != nil {
 		if !s.cfg.DynamicResp {
 			s.writeJSON(w, http.StatusBadRequest, map[string]string{
-				"error": "server does not support response configuration (--dynamic-resp not enabled)",
+				jsonErrorKey: "server does not support response configuration (--dynamic-resp not enabled)",
 			})
 			return
 		} else if !s.cfg.Auth && !req.Response.IsAllowedUnauthenticated() {
 			s.writeJSON(w, http.StatusBadRequest, map[string]string{
-				"error": "unauthenticated servers only allow 302/307 redirects with a Location header",
+				jsonErrorKey: "unauthenticated servers only allow 302/307 redirects with a Location header",
 			})
 			return
 		}
@@ -102,7 +105,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	_, err = s.storage.Register(r.Context(), req.CorrelationID, pubKey, req.SecretKey, req.Response)
 	if err != nil {
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": err.Error(),
+			jsonErrorKey: err.Error(),
 		})
 		return
 	}
@@ -118,7 +121,7 @@ func (s *Server) handlePoll(w http.ResponseWriter, r *http.Request) {
 
 	if len(id) < s.cfg.CorrelationIdLength {
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": fmt.Sprintf("correlation-id must be at least %d characters", s.cfg.CorrelationIdLength),
+			jsonErrorKey: fmt.Sprintf("correlation-id must be at least %d characters", s.cfg.CorrelationIdLength),
 		})
 		return
 	}
@@ -129,7 +132,7 @@ func (s *Server) handlePoll(w http.ResponseWriter, r *http.Request) {
 	handle, err := s.storage.GetSession(id, secret)
 	if err != nil {
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": err.Error(),
+			jsonErrorKey: err.Error(),
 		})
 		return
 	}
@@ -137,7 +140,7 @@ func (s *Server) handlePoll(w http.ResponseWriter, r *http.Request) {
 	interactions, err := handle.GetAndClearInteractions()
 	if err != nil {
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": err.Error(),
+			jsonErrorKey: err.Error(),
 		})
 		return
 	}
@@ -155,7 +158,7 @@ func (s *Server) handlePoll(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			s.logger.Error("failed to encrypt AES key", "error", err)
 			s.writeJSON(w, http.StatusInternalServerError, map[string]string{
-				"error": "encryption failed",
+				jsonErrorKey: "encryption failed",
 			})
 			return
 		}
@@ -196,14 +199,14 @@ func (s *Server) handleDeregister(w http.ResponseWriter, r *http.Request) {
 	var req deregisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": fmt.Sprintf("could not decode json body: %v", err),
+			jsonErrorKey: fmt.Sprintf("could not decode json body: %v", err),
 		})
 		return
 	}
 
 	if len(req.CorrelationID) < s.cfg.CorrelationIdLength {
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": fmt.Sprintf("correlation-id must be at least %d characters", s.cfg.CorrelationIdLength),
+			jsonErrorKey: fmt.Sprintf("correlation-id must be at least %d characters", s.cfg.CorrelationIdLength),
 		})
 		return
 	}
@@ -213,7 +216,7 @@ func (s *Server) handleDeregister(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.storage.Delete(req.CorrelationID, req.SecretKey); err != nil {
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": err.Error(),
+			jsonErrorKey: err.Error(),
 		})
 		return
 	}

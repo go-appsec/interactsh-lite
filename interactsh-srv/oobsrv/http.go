@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func (s *Server) startHTTP() error {
+func (s *Server) startHTTP(ctx context.Context) error {
 	addr := net.JoinHostPort(s.cfg.ListenIP, strconv.Itoa(s.cfg.HTTPPort))
 	svc := &httpService{
 		name:   "HTTP",
@@ -25,7 +25,7 @@ func (s *Server) startHTTP() error {
 			ErrorLog:          s.httpErrorLog(),
 		},
 	}
-	if err := svc.Start(); err != nil {
+	if err := svc.Start(ctx); err != nil {
 		return fmt.Errorf("[HTTP] bind %s: %w", addr, err)
 	}
 	s.addService(svc)
@@ -42,14 +42,14 @@ type httpService struct {
 
 func (h *httpService) Name() string { return h.name }
 
-func (h *httpService) Start() error {
+func (h *httpService) Start(ctx context.Context) error {
 	var ln net.Listener
 	var err error
 	if h.server.TLSConfig != nil {
 		ln, err = tls.Listen("tcp", h.server.Addr, h.server.TLSConfig)
 	} else {
 		var lc net.ListenConfig
-		ln, err = lc.Listen(context.Background(), "tcp", h.server.Addr)
+		ln, err = lc.Listen(ctx, "tcp", h.server.Addr)
 	}
 	if err != nil {
 		return err

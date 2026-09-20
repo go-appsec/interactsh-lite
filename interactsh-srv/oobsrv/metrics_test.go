@@ -20,7 +20,7 @@ func TestHandleMetrics(t *testing.T) {
 		})
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 		srv.Handler().ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -135,7 +135,7 @@ func TestHandleMetrics(t *testing.T) {
 		srv := testServerWithStorage(t)
 
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 		srv.Handler().ServeHTTP(rec, req)
 
 		// Falls through to the default handler, not the metrics handler
@@ -155,13 +155,13 @@ func TestHandleMetrics(t *testing.T) {
 
 		// Without token: 401
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 		srv.Handler().ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
 
 		// With correct token: 200
 		rec = httptest.NewRecorder()
-		req = httptest.NewRequest(http.MethodGet, "/metrics", nil)
+		req = httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 		req.Header.Set("Authorization", "test-token")
 		srv.Handler().ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -195,7 +195,7 @@ func getMetrics(t *testing.T, srv *Server) metricsResponse {
 	t.Helper()
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 	srv.Handler().ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
 

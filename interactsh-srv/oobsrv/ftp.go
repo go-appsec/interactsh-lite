@@ -215,7 +215,7 @@ func (s *Server) captureFTPInteraction(rawRequest, remoteAddr string) {
 }
 
 // startFTP starts FTP and FTPS interaction capture servers.
-func (s *Server) startFTP() {
+func (s *Server) startFTP(ctx context.Context) {
 	ftpDir := s.cfg.FTPDir
 	if ftpDir == "" {
 		var err error
@@ -238,18 +238,18 @@ func (s *Server) startFTP() {
 	perm := ftpserver.NewSimplePerm("interactsh", "interactsh")
 
 	// FTP (plain) on FTPPort
-	s.startFTPPort(driver, notifier, auth, perm, s.cfg.FTPPort, "FTP", false)
+	s.startFTPPort(ctx, driver, notifier, auth, perm, s.cfg.FTPPort, "FTP", false)
 
 	// FTPS (implicit TLS) on FTPSPort
 	if s.tlsConfig != nil {
-		s.startFTPPort(driver, notifier, auth, perm, s.cfg.FTPSPort, "FTPS", true)
+		s.startFTPPort(ctx, driver, notifier, auth, perm, s.cfg.FTPSPort, "FTPS", true)
 	} else {
 		s.logger.Info("FTPS disabled, no TLS config")
 	}
 }
 
 // startFTPPort binds and starts a single FTP listener. Non-fatal on bind failure.
-func (s *Server) startFTPPort(driver ftpserver.Driver, notifier ftpserver.Notifier, auth ftpserver.Auth, perm ftpserver.Perm, port int, name string, implicitTLS bool) {
+func (s *Server) startFTPPort(ctx context.Context, driver ftpserver.Driver, notifier ftpserver.Notifier, auth ftpserver.Auth, perm ftpserver.Perm, port int, name string, implicitTLS bool) {
 	addr := net.JoinHostPort(s.cfg.ListenIP, strconv.Itoa(port))
 
 	ftpSrv, err := ftpserver.NewServer(&ftpserver.Options{
@@ -272,7 +272,7 @@ func (s *Server) startFTPPort(driver ftpserver.Driver, notifier ftpserver.Notifi
 		ln, err = tls.Listen("tcp", addr, s.tlsConfig)
 	} else {
 		var lc net.ListenConfig
-		ln, err = lc.Listen(context.Background(), "tcp", addr)
+		ln, err = lc.Listen(ctx, "tcp", addr)
 	}
 	if err != nil {
 		s.logger.Warn(fmt.Sprintf("[%s] bind failed, skipping", name), "addr", addr, "error", err)
@@ -285,7 +285,7 @@ func (s *Server) startFTPPort(driver ftpserver.Driver, notifier ftpserver.Notifi
 		server:   ftpSrv,
 		listener: ln,
 	}
-	if err := svc.Start(); err != nil {
+	if err := svc.Start(ctx); err != nil {
 		s.logger.Warn(fmt.Sprintf("[%s] start failed, skipping", name), "error", err)
 		_ = ln.Close()
 		return
@@ -306,7 +306,7 @@ var _ Service = (*ftpService)(nil)
 
 func (f *ftpService) Name() string { return f.name }
 
-func (f *ftpService) Start() error {
+func (f *ftpService) Start(ctx context.Context) error {
 	go func() {
 		f.logger.Info(fmt.Sprintf("[%s] Listening on TCP %s", f.name, f.listener.Addr()))
 		if err := f.server.Serve(f.listener); err != nil {

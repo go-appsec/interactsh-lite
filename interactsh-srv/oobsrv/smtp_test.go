@@ -956,7 +956,7 @@ func TestStartSMTPPort(t *testing.T) {
 		port := ln.Addr().(*net.TCPAddr).Port
 
 		serviceCount := len(srv.services)
-		srv.startSMTPPort(backend, testDomain, port, "test-conflict", nil, false)
+		srv.startSMTPPort(t.Context(), backend, testDomain, port, "test-conflict", nil, false)
 
 		assert.Len(t, srv.services, serviceCount)
 	})
@@ -985,7 +985,7 @@ func TestStartSMTP(t *testing.T) {
 				srv.tlsConfig = testTLSConfig(t)
 			}
 
-			srv.startSMTP()
+			srv.startSMTP(t.Context())
 			t.Cleanup(srv.Shutdown)
 
 			names := make([]string, 0, len(srv.services))

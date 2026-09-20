@@ -43,6 +43,9 @@ const certEvictInterval = 2 * time.Hour
 // certExpiryWindow is the remaining lifetime fraction below which an ACME cert is evicted and re-issued.
 const certExpiryWindow = 1.0 / 4.0
 
+// certEvictWorkTimeout bounds one evictor tick (storage reads plus ACME re-issuance).
+const certEvictWorkTimeout = 10 * time.Minute
+
 type tlsErrorFilterHandler struct {
 	slog.Handler
 	verbose bool
@@ -126,7 +129,7 @@ func (s *Server) provisionTLS(ctx context.Context) {
 			s.logger.Error("failed to load custom certificate", "error", err)
 			return
 		}
-		if err := reloader.Start(); err != nil {
+		if err := reloader.Start(ctx); err != nil {
 			s.logger.Error("failed to start cert reloader", "error", err)
 			return
 		}
@@ -245,8 +248,10 @@ func (r *certReloader) GetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, e
 }
 
 func (r *certReloader) Name() string { return "cert-reloader" }
-func (r *certReloader) Start() error { go r.run(); return nil }
-func (r *certReloader) Close() error { close(r.done); <-r.stopped; return nil }
+
+// Start ignores ctx: the reloader polls until Close, never bounded by the startup ctx.
+func (r *certReloader) Start(_ context.Context) error { go r.run(); return nil }
+func (r *certReloader) Close() error                  { close(r.done); <-r.stopped; return nil }
 
 func (r *certReloader) run() {
 	defer close(r.stopped)
@@ -403,9 +408,9 @@ func (s *Server) provisionACME(ctx context.Context) (*tls.Config, error) {
 	}
 
 	// start the expiry-based cert evictor regardless of per-domain results; it only acts on stored certs
-	ev := newCertEvictor(s, storage)
-	_ = ev.Start()
-	s.addService(ev)
+	evt := newCertEvictor(s, storage)
+	_ = evt.Start(ctx)
+	s.addService(evt)
 
 	if successCount == 0 {
 		return nil, fmt.Errorf("all domains failed: %w", errors.Join(errs...))
@@ -448,7 +453,7 @@ func wildcardFallbackCertGetter(inner func(*tls.ClientHelloInfo) (*tls.Certifica
 }
 
 // startHTTPS starts the HTTPS listener. Skipped if no TLS config.
-func (s *Server) startHTTPS() error {
+func (s *Server) startHTTPS(ctx context.Context) error {
 	if s.tlsConfig == nil {
 		s.logger.Info("HTTPS disabled (no TLS config)")
 		return nil
@@ -467,7 +472,7 @@ func (s *Server) startHTTPS() error {
 			ErrorLog:          s.httpErrorLog(),
 		},
 	}
-	if err := svc.Start(); err != nil {
+	if err := svc.Start(ctx); err != nil {
 		return fmt.Errorf("[HTTPS] bind %s: %w", addr, err)
 	}
 	s.addService(svc)
@@ -527,10 +532,15 @@ func newCertEvictor(s *Server, storage certmagic.Storage) *certEvictor {
 }
 
 func (e *certEvictor) Name() string { return "cert-evictor" }
-func (e *certEvictor) Start() error { go e.run(); return nil }
+
+// Start detaches the run loop from startup cancellation; Close stops it.
+func (e *certEvictor) Start(ctx context.Context) error {
+	go e.run(context.WithoutCancel(ctx))
+	return nil
+}
 func (e *certEvictor) Close() error { close(e.done); return nil }
 
-func (e *certEvictor) run() {
+func (e *certEvictor) run(ctx context.Context) {
 	ticker := time.NewTicker(e.interval)
 	defer ticker.Stop()
 	for {
@@ -538,7 +548,10 @@ func (e *certEvictor) run() {
 		case <-e.done:
 			return
 		case <-ticker.C:
-			e.evictExpiring(context.Background())
+			// per-tick bound; ctx itself has no deadline or cancellation
+			tctx, cancel := context.WithTimeout(ctx, certEvictWorkTimeout)
+			e.evictExpiring(tctx)
+			cancel()
 		}
 	}
 }
@@ -571,7 +584,7 @@ func (e *certEvictor) evictExpiring(ctx context.Context) {
 // checkAndEvict removes the stored cert for subject if it is expired or within certExpiryWindow of expiry.
 // Returns true when a cert was removed so the caller can re-issue it.
 func (e *certEvictor) checkAndEvict(ctx context.Context, issuerKey, subject string) (bool, error) {
-	leaf, err := e.loadLeaf(issuerKey, subject)
+	leaf, err := e.loadLeaf(ctx, issuerKey, subject)
 	if errors.Is(err, fs.ErrNotExist) || leaf == nil {
 		return false, nil // not provisioned yet; ManageSync will obtain it
 	}
@@ -590,8 +603,8 @@ func (e *certEvictor) checkAndEvict(ctx context.Context, issuerKey, subject stri
 }
 
 // loadLeaf loads and parses the stored cert for subject.
-func (e *certEvictor) loadLeaf(issuerKey, subject string) (*x509.Certificate, error) {
-	pemBytes, err := e.storage.Load(context.Background(), certmagic.StorageKeys.SiteCert(issuerKey, subject))
+func (e *certEvictor) loadLeaf(ctx context.Context, issuerKey, subject string) (*x509.Certificate, error) {
+	pemBytes, err := e.storage.Load(ctx, certmagic.StorageKeys.SiteCert(issuerKey, subject))
 	if err != nil {
 		return nil, err
 	}

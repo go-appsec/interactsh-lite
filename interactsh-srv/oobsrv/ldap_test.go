@@ -28,7 +28,7 @@ func ldapTestServer(t *testing.T, srv *Server) string {
 	mux.Modify(srv.handleLDAPModify)
 	mux.Compare(srv.handleLDAPCompare)
 	mux.Abandon(srv.handleLDAPAbandon)
-	mux.Extended(srv.handleLDAPStartTLS()).RequestName(ldapserver.NoticeOfStartTLS)
+	mux.Extended(srv.handleLDAPStartTLS(t.Context())).RequestName(ldapserver.NoticeOfStartTLS)
 	mux.Extended(srv.handleLDAPWhoAmI()).RequestName(ldapserver.NoticeOfWhoAmI)
 	mux.NotFound(srv.handleLDAPNotFound)
 
@@ -564,7 +564,7 @@ func TestStartLDAP(t *testing.T) {
 		srv.cfg.LDAPPort = ln.Addr().(*net.TCPAddr).Port
 
 		serviceCount := len(srv.services)
-		srv.startLDAP()
+		srv.startLDAP(t.Context())
 
 		assert.Len(t, srv.services, serviceCount)
 	})

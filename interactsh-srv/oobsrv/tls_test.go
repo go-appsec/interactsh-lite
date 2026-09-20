@@ -219,7 +219,7 @@ func TestCertReloader(t *testing.T) {
 		require.NoError(t, err)
 		r.interval = 10 * time.Millisecond
 
-		require.NoError(t, r.Start())
+		require.NoError(t, r.Start(t.Context()))
 		t.Cleanup(func() { _ = r.Close() })
 
 		origCert, err := r.GetCertificate(nil)
@@ -242,7 +242,7 @@ func TestCertReloader(t *testing.T) {
 		require.NoError(t, err)
 		r.interval = 10 * time.Millisecond
 
-		require.NoError(t, r.Start())
+		require.NoError(t, r.Start(t.Context()))
 		t.Cleanup(func() { _ = r.Close() })
 
 		origCert, err := r.GetCertificate(nil)
@@ -263,7 +263,7 @@ func TestCertReloader(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, "cert-reloader", r.Name())
-		require.NoError(t, r.Start())
+		require.NoError(t, r.Start(t.Context()))
 
 		// Close should return promptly without hanging
 		done := make(chan struct{})
@@ -611,7 +611,7 @@ func TestStartHTTPS(t *testing.T) {
 
 		// Verify service is registered (reloader already added by provisionTLS)
 		initialCount := len(srv.services)
-		require.NoError(t, srv.startHTTPS())
+		require.NoError(t, srv.startHTTPS(t.Context()))
 		assert.Len(t, srv.services, initialCount+1)
 		assert.Equal(t, "HTTPS", srv.services[len(srv.services)-1].Name())
 	})
@@ -623,7 +623,7 @@ func TestStartHTTPS(t *testing.T) {
 		srv.tlsConfig = nil
 
 		initialCount := len(srv.services)
-		require.NoError(t, srv.startHTTPS())
+		require.NoError(t, srv.startHTTPS(t.Context()))
 		assert.Len(t, srv.services, initialCount)
 	})
 }

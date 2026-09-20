@@ -41,7 +41,7 @@ func BenchmarkHTTPRegister(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(bodies[i]))
+		req := httptest.NewRequestWithContext(b.Context(), http.MethodPost, "/register", bytes.NewReader(bodies[i]))
 		srv.Handler().ServeHTTP(httptest.NewRecorder(), req)
 	}
 }
@@ -55,12 +55,12 @@ func BenchmarkHTTPRegisterKeepAlive(b *testing.B) {
 
 	// Initial registration
 	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body)))
+	srv.Handler().ServeHTTP(rec, httptest.NewRequestWithContext(b.Context(), http.MethodPost, "/register", bytes.NewReader(body)))
 	require.Equal(b, http.StatusOK, rec.Code)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+		req := httptest.NewRequestWithContext(b.Context(), http.MethodPost, "/register", bytes.NewReader(body))
 		srv.Handler().ServeHTTP(httptest.NewRecorder(), req)
 	}
 }
@@ -76,7 +76,7 @@ func BenchmarkHTTPPollEmpty(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req := httptest.NewRequest(http.MethodGet, pollURL, nil)
+		req := httptest.NewRequestWithContext(b.Context(), http.MethodGet, pollURL, nil)
 		srv.Handler().ServeHTTP(httptest.NewRecorder(), req)
 	}
 }
@@ -102,7 +102,7 @@ func BenchmarkMemHTTPPollWithEvents(b *testing.B) {
 				data := slices.Clone(template)
 				fillSessionInteractions(ms, cid, data)
 
-				req := httptest.NewRequest(http.MethodGet, pollURL, nil)
+				req := httptest.NewRequestWithContext(b.Context(), http.MethodGet, pollURL, nil)
 				srv.Handler().ServeHTTP(httptest.NewRecorder(), req)
 			}
 		})
@@ -125,7 +125,7 @@ func BenchmarkHTTPDeregister(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req := httptest.NewRequest(http.MethodPost, "/deregister", bytes.NewReader(bodies[i]))
+		req := httptest.NewRequestWithContext(b.Context(), http.MethodPost, "/deregister", bytes.NewReader(bodies[i]))
 		srv.Handler().ServeHTTP(httptest.NewRecorder(), req)
 	}
 }
@@ -145,13 +145,13 @@ func BenchmarkHTTPCaptureAndPoll(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// Capture: HTTP request to default handler
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(b.Context(), http.MethodGet, "/", nil)
 		req.Host = host
 		srv.Handler().ServeHTTP(rec, req)
 
 		// Poll: retrieve captured interaction
 		rec = httptest.NewRecorder()
-		req = httptest.NewRequest(http.MethodGet, pollURL, nil)
+		req = httptest.NewRequestWithContext(b.Context(), http.MethodGet, pollURL, nil)
 		srv.Handler().ServeHTTP(rec, req)
 	}
 }
@@ -440,7 +440,7 @@ func BenchmarkConcurrentCaptureAndPoll(b *testing.B) {
 						return
 					case <-ticker.C:
 						for i := range sessions {
-							req := httptest.NewRequest(http.MethodGet, sessions[i].pollURL, nil)
+							req := httptest.NewRequestWithContext(b.Context(), http.MethodGet, sessions[i].pollURL, nil)
 							handler.ServeHTTP(httptest.NewRecorder(), req)
 						}
 					}
@@ -453,7 +453,7 @@ func BenchmarkConcurrentCaptureAndPoll(b *testing.B) {
 					defer workerWg.Done()
 
 					for j := 0; j < interactionsEach; j++ {
-						req := httptest.NewRequest(http.MethodGet, "/", nil)
+						req := httptest.NewRequestWithContext(b.Context(), http.MethodGet, "/", nil)
 						req.Host = s.host
 						handler.ServeHTTP(httptest.NewRecorder(), req)
 					}

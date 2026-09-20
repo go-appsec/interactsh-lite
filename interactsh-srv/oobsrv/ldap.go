@@ -19,7 +19,7 @@ func init() {
 }
 
 // startLDAP starts the LDAP interaction capture server. Non-fatal on bind failure.
-func (s *Server) startLDAP() {
+func (s *Server) startLDAP(ctx context.Context) {
 	addr := net.JoinHostPort(s.cfg.ListenIP, strconv.Itoa(s.cfg.LDAPPort))
 
 	mux := ldapserver.NewRouteMux()
@@ -30,7 +30,7 @@ func (s *Server) startLDAP() {
 	mux.Modify(s.handleLDAPModify)
 	mux.Compare(s.handleLDAPCompare)
 	mux.Abandon(s.handleLDAPAbandon)
-	mux.Extended(s.handleLDAPStartTLS()).RequestName(ldapserver.NoticeOfStartTLS)
+	mux.Extended(s.handleLDAPStartTLS(ctx)).RequestName(ldapserver.NoticeOfStartTLS)
 	mux.Extended(s.handleLDAPWhoAmI()).RequestName(ldapserver.NoticeOfWhoAmI)
 	mux.NotFound(s.handleLDAPNotFound)
 
@@ -43,7 +43,7 @@ func (s *Server) startLDAP() {
 		server: srv,
 		addr:   addr,
 	}
-	if err := svc.Start(); err != nil {
+	if err := svc.Start(ctx); err != nil {
 		s.logger.Warn("[LDAP] start failed, skipping", "error", err)
 		return
 	}
@@ -63,9 +63,9 @@ var _ Service = (*ldapService)(nil)
 
 func (l *ldapService) Name() string { return l.name }
 
-func (l *ldapService) Start() error {
+func (l *ldapService) Start(ctx context.Context) error {
 	var lc net.ListenConfig
-	ln, err := lc.Listen(context.Background(), "tcp", l.addr)
+	ln, err := lc.Listen(ctx, "tcp", l.addr)
 	if err != nil {
 		return err
 	}
@@ -225,8 +225,11 @@ func (s *Server) handleLDAPAbandon(_ ldapserver.ResponseWriter, m *ldapserver.Me
 	}
 }
 
+// ldapStartTLSTimeout bounds a single StartTLS handshake.
+const ldapStartTLSTimeout = 10 * time.Second
+
 // handleLDAPStartTLS returns a handler for StartTLS extended operations.
-func (s *Server) handleLDAPStartTLS() ldapserver.HandlerFunc {
+func (s *Server) handleLDAPStartTLS(ctx context.Context) ldapserver.HandlerFunc {
 	return func(w ldapserver.ResponseWriter, m *ldapserver.Message) {
 		s.ldapCount.Add(1)
 
@@ -247,7 +250,10 @@ func (s *Server) handleLDAPStartTLS() ldapserver.HandlerFunc {
 		res.SetResponseName(ldapserver.NoticeOfStartTLS)
 		w.Write(res)
 
-		if err := tlsConn.HandshakeContext(context.Background()); err != nil {
+		// per-connection timeout, detached from the startup ctx's cancellation
+		hctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), ldapStartTLSTimeout)
+		defer cancel()
+		if err := tlsConn.HandshakeContext(hctx); err != nil {
 			s.logger.Debug("LDAP StartTLS handshake failed", "error", err)
 			return
 		}

@@ -43,10 +43,9 @@ func ClassifyIPs(ips []string) ServerIPs {
 }
 
 // DetectIPs discovers public IPv4 and IPv6 addresses. Errors only if both fail.
-func DetectIPs(logger *slog.Logger) (ServerIPs, error) {
+func DetectIPs(ctx context.Context, logger *slog.Logger) (ServerIPs, error) {
 	var result ServerIPs
 	var v4err, v6err error
-	ctx := context.Background()
 
 	if ip, err := detectIPv4(ctx); err != nil {
 		v4err = err

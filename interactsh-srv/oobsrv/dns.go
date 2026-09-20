@@ -157,17 +157,17 @@ var _ Service = (*dnsService)(nil)
 
 func (d *dnsService) Name() string { return d.name }
 
-func (d *dnsService) Start() error {
+func (d *dnsService) Start(ctx context.Context) error {
 	var lc net.ListenConfig
 	switch d.server.Net {
 	case "udp":
-		pc, err := lc.ListenPacket(context.Background(), "udp", d.server.Addr)
+		pc, err := lc.ListenPacket(ctx, "udp", d.server.Addr)
 		if err != nil {
 			return err
 		}
 		d.server.PacketConn = pc
 	case "tcp":
-		ln, err := lc.Listen(context.Background(), "tcp", d.server.Addr)
+		ln, err := lc.Listen(ctx, "tcp", d.server.Addr)
 		if err != nil {
 			return err
 		}
@@ -573,7 +573,7 @@ func (s *Server) captureDNSInteraction(r *dns.Msg, rawResponse string, qtype uin
 	}
 }
 
-func (s *Server) startDNS() error {
+func (s *Server) startDNS(ctx context.Context) error {
 	addr := net.JoinHostPort(s.cfg.ListenIP, strconv.Itoa(s.cfg.DNSPort))
 	handler := dns.HandlerFunc(s.handleDNS)
 
@@ -583,7 +583,7 @@ func (s *Server) startDNS() error {
 		logger: s.logger,
 		server: &dns.Server{Addr: addr, Net: "udp", Handler: handler},
 	}
-	if err := udpSvc.Start(); err != nil {
+	if err := udpSvc.Start(ctx); err != nil {
 		return fmt.Errorf("DNS UDP bind %s: %w", addr, err)
 	}
 	s.addService(udpSvc)
@@ -594,7 +594,7 @@ func (s *Server) startDNS() error {
 		logger: s.logger,
 		server: &dns.Server{Addr: addr, Net: "tcp", Handler: handler},
 	}
-	if err := tcpSvc.Start(); err != nil {
+	if err := tcpSvc.Start(ctx); err != nil {
 		s.logger.Warn("DNS TCP bind failed, continuing with UDP only", "error", err)
 	} else {
 		s.addService(tcpSvc)
@@ -603,7 +603,7 @@ func (s *Server) startDNS() error {
 }
 
 // resolveIPs classifies configured IPs or auto-detects them.
-func (s *Server) resolveIPs() error {
+func (s *Server) resolveIPs(ctx context.Context) error {
 	if len(s.cfg.IPs) > 0 {
 		s.ips = ClassifyIPs(s.cfg.IPs)
 		s.logger.Info("using configured IPs", "ipv4", formatIPs(s.ips.IPv4), "ipv6", formatIPs(s.ips.IPv6))
@@ -617,7 +617,7 @@ func (s *Server) resolveIPs() error {
 		return nil
 	}
 
-	ips, err := DetectIPs(s.logger)
+	ips, err := DetectIPs(ctx, s.logger)
 	if err != nil {
 		return err
 	}

@@ -421,7 +421,7 @@ func TestStartFTP(t *testing.T) {
 		srv.cfg.FTPSPort = ln.Addr().(*net.TCPAddr).Port
 
 		serviceCount := len(srv.services)
-		srv.startFTP()
+		srv.startFTP(t.Context())
 		t.Cleanup(srv.Shutdown)
 
 		// FTP fails to bind, FTPS skipped (no TLS), no new services
@@ -451,7 +451,7 @@ func TestStartFTP(t *testing.T) {
 				srv.tlsConfig = testTLSConfig(t)
 			}
 
-			srv.startFTP()
+			srv.startFTP(t.Context())
 			t.Cleanup(srv.Shutdown)
 
 			names := make([]string, 0, len(srv.services))

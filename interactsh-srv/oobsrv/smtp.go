@@ -332,7 +332,7 @@ func (l *slogSMTPLogger) Println(v ...interface{}) {
 
 func (s *smtpService) Name() string { return s.name }
 
-func (s *smtpService) Start() error {
+func (s *smtpService) Start(ctx context.Context) error {
 	go func() {
 		s.logger.Info(fmt.Sprintf("[%s] Listening on TCP %s", s.name, s.listener.Addr()))
 		if err := s.server.Serve(s.listener); err != nil {
@@ -346,26 +346,26 @@ func (s *smtpService) Close() error {
 	return s.server.Close()
 }
 
-func (s *Server) startSMTP() {
+func (s *Server) startSMTP(ctx context.Context) {
 	backend := &smtpBackend{server: s}
 	hostname := s.cfg.Domains[0]
 
 	// Port 25: plain SMTP
-	s.startSMTPPort(backend, hostname, s.cfg.SMTPPort, "SMTP", nil, false)
+	s.startSMTPPort(ctx, backend, hostname, s.cfg.SMTPPort, "SMTP", nil, false)
 
 	// Port 587: STARTTLS (plaintext with optional TLS upgrade)
-	s.startSMTPPort(backend, hostname, s.cfg.SMTPSPort, "SMTP-STARTTLS", s.tlsConfig, false)
+	s.startSMTPPort(ctx, backend, hostname, s.cfg.SMTPSPort, "SMTP-STARTTLS", s.tlsConfig, false)
 
 	// Port 465: implicit TLS (only if TLS available)
 	if s.tlsConfig != nil {
-		s.startSMTPPort(backend, hostname, s.cfg.SMTPAutoTLSPort, "SMTPS", s.tlsConfig, true)
+		s.startSMTPPort(ctx, backend, hostname, s.cfg.SMTPAutoTLSPort, "SMTPS", s.tlsConfig, true)
 	} else {
 		s.logger.Info("SMTPS (implicit TLS) disabled, no TLS config")
 	}
 }
 
 // startSMTPPort binds and starts a single SMTP listener. Non-fatal on bind failure.
-func (s *Server) startSMTPPort(backend smtp.Backend, hostname string, port int, name string, tlsCfg *tls.Config, implicitTLS bool) {
+func (s *Server) startSMTPPort(ctx context.Context, backend smtp.Backend, hostname string, port int, name string, tlsCfg *tls.Config, implicitTLS bool) {
 	addr := net.JoinHostPort(s.cfg.ListenIP, strconv.Itoa(port))
 
 	smtpSrv := smtp.NewServer(backend)
@@ -386,7 +386,7 @@ func (s *Server) startSMTPPort(backend smtp.Backend, hostname string, port int, 
 		ln, err = tls.Listen("tcp", addr, tlsCfg)
 	} else {
 		var lc net.ListenConfig
-		ln, err = lc.Listen(context.Background(), "tcp", addr)
+		ln, err = lc.Listen(ctx, "tcp", addr)
 	}
 	if err != nil {
 		s.logger.Warn(fmt.Sprintf("[%s] bind failed, skipping", name), "addr", addr, "error", err)
@@ -401,7 +401,7 @@ func (s *Server) startSMTPPort(backend smtp.Backend, hostname string, port int, 
 		server:   smtpSrv,
 		listener: ln,
 	}
-	if err := svc.Start(); err != nil {
+	if err := svc.Start(ctx); err != nil {
 		s.logger.Warn(fmt.Sprintf("[%s] start failed, skipping", name), "error", err)
 		_ = ln.Close()
 		return

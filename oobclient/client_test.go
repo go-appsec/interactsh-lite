@@ -1661,12 +1661,10 @@ func TestDecryptInteraction(t *testing.T) {
 		block, err := aes.NewCipher(aesKey)
 		require.NoError(t, err)
 
-		ciphertext := make([]byte, len(plaintext))
+		fullCiphertext := make([]byte, aes.BlockSize+len(plaintext))
+		copy(fullCiphertext[:aes.BlockSize], iv)
 		stream := cipher.NewCTR(block, iv)
-		stream.XORKeyStream(ciphertext, plaintext)
-
-		// Prepend IV to ciphertext
-		fullCiphertext := append(iv, ciphertext...)
+		stream.XORKeyStream(fullCiphertext[aes.BlockSize:], plaintext)
 
 		// Encrypt AES key with RSA-OAEP
 		encryptedKey, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, &privateKey.PublicKey, aesKey, nil)
@@ -1799,11 +1797,10 @@ func TestPollingWithEncryptedData(t *testing.T) {
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
-				ciphertext := make([]byte, len(plaintext))
+				fullCiphertext := make([]byte, aes.BlockSize+len(plaintext))
+				copy(fullCiphertext[:aes.BlockSize], iv)
 				stream := cipher.NewCTR(block, iv)
-				stream.XORKeyStream(ciphertext, plaintext)
-
-				fullCiphertext := append(iv, ciphertext...)
+				stream.XORKeyStream(fullCiphertext[aes.BlockSize:], plaintext)
 
 				// Encrypt AES key with client's RSA public key
 				encryptedKey, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, pubKey, aesKey, nil)
@@ -1989,11 +1986,10 @@ func TestPollingWithEncryptedData(t *testing.T) {
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
-				ciphertext := make([]byte, len(plaintext))
+				fullCiphertext := make([]byte, aes.BlockSize+len(plaintext))
+				copy(fullCiphertext[:aes.BlockSize], iv)
 				stream := cipher.NewCTR(block, iv)
-				stream.XORKeyStream(ciphertext, plaintext)
-
-				fullCiphertext := append(iv, ciphertext...)
+				stream.XORKeyStream(fullCiphertext[aes.BlockSize:], plaintext)
 
 				encryptedKey, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, pubKey, aesKey, nil)
 				if err != nil {

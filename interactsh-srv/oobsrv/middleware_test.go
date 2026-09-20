@@ -24,7 +24,7 @@ func TestCORSMiddleware(t *testing.T) {
 	t.Run("options_returns_204", func(t *testing.T) {
 		h := CORSMiddleware("*", inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodOptions, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodOptions, "/", nil)
 		h.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusNoContent, rec.Code)
@@ -38,7 +38,7 @@ func TestCORSMiddleware(t *testing.T) {
 	t.Run("get_passes_through", func(t *testing.T) {
 		h := CORSMiddleware("*", inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		h.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -49,7 +49,7 @@ func TestCORSMiddleware(t *testing.T) {
 	t.Run("custom_acao_url", func(t *testing.T) {
 		h := CORSMiddleware("https://example.com", inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		h.ServeHTTP(rec, req)
 
 		assert.Equal(t, "https://example.com", rec.Header().Get("Access-Control-Allow-Origin"))
@@ -67,7 +67,7 @@ func TestInteractionCORSMiddleware(t *testing.T) {
 	t.Run("reflects_origin", func(t *testing.T) {
 		h := InteractionCORSMiddleware(inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Header.Set("Origin", "https://evil.example.com")
 		h.ServeHTTP(rec, req)
 
@@ -86,7 +86,7 @@ func TestInteractionCORSMiddleware(t *testing.T) {
 	t.Run("wildcard_without_origin", func(t *testing.T) {
 		h := InteractionCORSMiddleware(inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		h.ServeHTTP(rec, req)
 
 		assert.Equal(t, "*", rec.Header().Get("Access-Control-Allow-Origin"))
@@ -96,7 +96,7 @@ func TestInteractionCORSMiddleware(t *testing.T) {
 	t.Run("options_reflects_preflight", func(t *testing.T) {
 		h := InteractionCORSMiddleware(inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodOptions, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodOptions, "/", nil)
 		req.Header.Set("Origin", "https://attacker.com")
 		req.Header.Set("Access-Control-Request-Method", "POST")
 		req.Header.Set("Access-Control-Request-Headers", "authorization, content-type")
@@ -118,7 +118,7 @@ func TestInteractionCORSMiddleware(t *testing.T) {
 	t.Run("options_without_request_headers", func(t *testing.T) {
 		h := InteractionCORSMiddleware(inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodOptions, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodOptions, "/", nil)
 		req.Header.Set("Origin", "https://attacker.com")
 		h.ServeHTTP(rec, req)
 
@@ -130,7 +130,7 @@ func TestInteractionCORSMiddleware(t *testing.T) {
 	t.Run("options_reflects_nonstandard_method", func(t *testing.T) {
 		h := InteractionCORSMiddleware(inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodOptions, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodOptions, "/", nil)
 		req.Header.Set("Access-Control-Request-Method", "PROPFIND")
 		h.ServeHTTP(rec, req)
 
@@ -141,7 +141,7 @@ func TestInteractionCORSMiddleware(t *testing.T) {
 	t.Run("options_reflects_lowercase_method", func(t *testing.T) {
 		h := InteractionCORSMiddleware(inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodOptions, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodOptions, "/", nil)
 		req.Header.Set("Access-Control-Request-Method", "mkcol")
 		h.ServeHTTP(rec, req)
 
@@ -151,7 +151,7 @@ func TestInteractionCORSMiddleware(t *testing.T) {
 	t.Run("options_standard_method_unchanged", func(t *testing.T) {
 		h := InteractionCORSMiddleware(inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodOptions, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodOptions, "/", nil)
 		req.Header.Set("Access-Control-Request-Method", "POST")
 		h.ServeHTTP(rec, req)
 
@@ -161,7 +161,7 @@ func TestInteractionCORSMiddleware(t *testing.T) {
 	t.Run("options_private_network_reflected", func(t *testing.T) {
 		h := InteractionCORSMiddleware(inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodOptions, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodOptions, "/", nil)
 		req.Header.Set("Access-Control-Request-Private-Network", "true")
 		h.ServeHTTP(rec, req)
 
@@ -171,7 +171,7 @@ func TestInteractionCORSMiddleware(t *testing.T) {
 	t.Run("options_private_network_absent", func(t *testing.T) {
 		h := InteractionCORSMiddleware(inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodOptions, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodOptions, "/", nil)
 		h.ServeHTTP(rec, req)
 
 		assert.Empty(t, rec.Header().Get("Access-Control-Allow-Private-Network"))
@@ -180,7 +180,7 @@ func TestInteractionCORSMiddleware(t *testing.T) {
 	t.Run("options_private_network_non_true", func(t *testing.T) {
 		h := InteractionCORSMiddleware(inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodOptions, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodOptions, "/", nil)
 		req.Header.Set("Access-Control-Request-Private-Network", "false")
 		h.ServeHTTP(rec, req)
 
@@ -190,7 +190,7 @@ func TestInteractionCORSMiddleware(t *testing.T) {
 	t.Run("corp_set_on_get", func(t *testing.T) {
 		h := InteractionCORSMiddleware(inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		h.ServeHTTP(rec, req)
 
 		assert.Equal(t, "cross-origin", rec.Header().Get("Cross-Origin-Resource-Policy"))
@@ -199,7 +199,7 @@ func TestInteractionCORSMiddleware(t *testing.T) {
 	t.Run("corp_set_on_options", func(t *testing.T) {
 		h := InteractionCORSMiddleware(inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodOptions, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodOptions, "/", nil)
 		h.ServeHTTP(rec, req)
 
 		assert.Equal(t, "cross-origin", rec.Header().Get("Cross-Origin-Resource-Policy"))
@@ -228,7 +228,7 @@ func TestAuthMiddleware(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := AuthMiddleware(true, "secret", inner)
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 			if tt.authHdr != "" {
 				req.Header.Set("Authorization", tt.authHdr)
 			}
@@ -242,7 +242,7 @@ func TestAuthMiddleware(t *testing.T) {
 	t.Run("disabled_passes_all", func(t *testing.T) {
 		h := AuthMiddleware(false, "", inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		h.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -257,7 +257,7 @@ func TestAuthMiddleware(t *testing.T) {
 
 		h := AuthMiddleware(true, "", inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		// No Authorization header - Get returns "" which matches empty token
 		h.ServeHTTP(rec, req)
 
@@ -273,7 +273,7 @@ func TestAuthMiddleware(t *testing.T) {
 
 		h := AuthMiddleware(true, "", inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Header.Set("Authorization", "anything")
 		h.ServeHTTP(rec, req)
 
@@ -303,7 +303,7 @@ func TestLoggerMiddleware(t *testing.T) {
 
 		h := LoggerMiddleware("", callback, inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader("request body"))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test", strings.NewReader("request body"))
 		req.RemoteAddr = "192.168.1.1:12345"
 		h.ServeHTTP(rec, req)
 
@@ -331,7 +331,7 @@ func TestLoggerMiddleware(t *testing.T) {
 
 		h := LoggerMiddleware("X-Real-IP", callback, inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.RemoteAddr = "10.0.0.1:1234"
 		req.Header.Set("X-Real-IP", "203.0.113.1")
 		h.ServeHTTP(rec, req)
@@ -353,7 +353,7 @@ func TestLoggerMiddleware(t *testing.T) {
 		corsInner := InteractionCORSMiddleware(inner)
 		h := LoggerMiddleware("", callback, corsInner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodOptions, "/test", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodOptions, "/test", nil)
 		req.RemoteAddr = "1.2.3.4:5"
 		h.ServeHTTP(rec, req)
 
@@ -364,7 +364,7 @@ func TestLoggerMiddleware(t *testing.T) {
 	t.Run("nil_callback", func(t *testing.T) {
 		h := LoggerMiddleware("", nil, inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		h.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusCreated, rec.Code)
@@ -380,7 +380,7 @@ func TestLoggerMiddleware(t *testing.T) {
 
 		h := LoggerMiddleware("", nil, inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		h.ServeHTTP(rec, req)
 
 		// Implicit WriteHeader(200) from Write wins
@@ -402,7 +402,7 @@ func TestMaxRequestSizeMiddleware(t *testing.T) {
 		h := MaxRequestSizeMiddleware(1, inner) // 1 MB
 		largeBody := strings.Repeat("x", 2*1024*1024)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(largeBody))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/", strings.NewReader(largeBody))
 		h.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -413,7 +413,7 @@ func TestMaxRequestSizeMiddleware(t *testing.T) {
 		h := MaxRequestSizeMiddleware(1, inner)
 		const body = "small body"
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/", strings.NewReader(body))
 		h.ServeHTTP(rec, req)
 
 		assert.Equal(t, body, rec.Body.String())
@@ -431,7 +431,7 @@ func TestMaxRequestSizeMiddleware(t *testing.T) {
 		h := MaxRequestSizeMiddleware(1, inner)
 		body := strings.NewReader(strings.Repeat("x", bodySize))
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/", body)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/", body)
 		h.ServeHTTP(rec, req)
 
 		assert.Equal(t, bodySize, receivedLen)
@@ -456,7 +456,7 @@ func TestExtractRemoteAddr(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 			req.RemoteAddr = tt.remoteAddr
 			if tt.headerValue != "" {
 				req.Header.Set(tt.originIPHeader, tt.headerValue)
@@ -476,7 +476,7 @@ func TestResponseHeadersMiddleware(t *testing.T) {
 	t.Run("sets_server_header", func(t *testing.T) {
 		h := ResponseHeadersMiddleware("myserver", "v1.0", false, false, inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		h.ServeHTTP(rec, req)
 
 		assert.Equal(t, "myserver", rec.Header().Get("Server"))
@@ -486,7 +486,7 @@ func TestResponseHeadersMiddleware(t *testing.T) {
 	t.Run("version_header_disabled", func(t *testing.T) {
 		h := ResponseHeadersMiddleware("srv", "v1.0", true, false, inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		h.ServeHTTP(rec, req)
 
 		assert.Equal(t, "srv", rec.Header().Get("Server"))
@@ -496,7 +496,7 @@ func TestResponseHeadersMiddleware(t *testing.T) {
 	t.Run("api_content_headers", func(t *testing.T) {
 		h := ResponseHeadersMiddleware("srv", "v1", false, true, inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/api", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api", nil)
 		h.ServeHTTP(rec, req)
 
 		assert.Equal(t, "application/json; charset=utf-8", rec.Header().Get("Content-Type"))
@@ -506,7 +506,7 @@ func TestResponseHeadersMiddleware(t *testing.T) {
 	t.Run("non_api_no_content_headers", func(t *testing.T) {
 		h := ResponseHeadersMiddleware("srv", "v1", false, false, inner)
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		h.ServeHTTP(rec, req)
 
 		assert.Empty(t, rec.Header().Get("X-Content-Type-Options"))
