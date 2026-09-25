@@ -18,6 +18,12 @@ import (
 
 const teeConnMaxBuf = 8192 // 8 KB cap for raw SMTP envelope capture
 
+// Connection idle/response deadlines, applied only when non-zero.
+const (
+	smtpReadTimeout  = time.Minute      // bound idle connections and slow DATA bodies
+	smtpWriteTimeout = 30 * time.Second // response write deadline
+)
+
 // teeConn wraps a net.Conn and copies Read bytes into a capped buffer.
 // Used to capture raw SMTP commands before go-smtp's parser normalizes them.
 // go-smtp processes one connection per goroutine, so no mutex is needed.
@@ -371,6 +377,9 @@ func (s *Server) startSMTPPort(ctx context.Context, backend smtp.Backend, hostna
 	smtpSrv := smtp.NewServer(backend)
 	smtpSrv.Domain = hostname
 	smtpSrv.AllowInsecureAuth = true
+	// Idle/response deadlines to bound idle-connection resource use.
+	smtpSrv.ReadTimeout = smtpReadTimeout
+	smtpSrv.WriteTimeout = smtpWriteTimeout
 	// Do not set MaxMessageBytes: advertise SIZE 0 (unlimited) so clients never refuse to send
 	// Body truncation is handled in Data()
 	smtpSrv.ErrorLog = &slogSMTPLogger{logger: s.logger}
@@ -393,7 +402,10 @@ func (s *Server) startSMTPPort(ctx context.Context, backend smtp.Backend, hostna
 		return
 	}
 
-	ln = &teeListener{Listener: ln}
+	// teeConn hides the *tls.Conn from go-smtp's TLSConnectionState, breaking SMTPS.
+	if !implicitTLS {
+		ln = &teeListener{Listener: ln}
+	}
 
 	svc := &smtpService{
 		name:     name,
