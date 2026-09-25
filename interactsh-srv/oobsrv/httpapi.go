@@ -305,7 +305,7 @@ func (s *Server) serveResponse(w http.ResponseWriter, r *http.Request, correlati
 
 	// Sub-path 2: session-stored response
 	if correlationID != "" {
-		if cfg := s.storage.GetResponse(correlationID); cfg != nil {
+		if cfg := s.storage.GetResponse(correlationID); cfg != nil && (s.cfg.Auth || cfg.IsAllowedUnauthenticated()) {
 			writeResponseConfig(w, r, cfg, reflection)
 			return true
 		}

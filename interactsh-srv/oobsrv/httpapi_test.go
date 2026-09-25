@@ -860,6 +860,28 @@ func TestServeDefault(t *testing.T) {
 		assert.Contains(t, rec.Body.String(), reverseString(testCorrelationID+testNonce))
 	})
 
+	t.Run("session_stored_unauth_rejected", func(t *testing.T) {
+		srv := testServerWithStorage(t, func(c *Config) {
+			c.DynamicResp = true
+		})
+		pubKey := &sharedRSAKey.PublicKey
+		_, err := srv.storage.Register(t.Context(), testCorrelationID, pubKey, "secret", &oobclient.ResponseConfig{
+			StatusCode: 200,
+			Headers:    []string{"Content-Type: text/plain"},
+			Body:       "custom body",
+		})
+		require.NoError(t, err)
+
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/somepath", nil)
+		req.Host = testCorrelationID + testNonce + ".test.com"
+		srv.serveDefault(rec, req)
+
+		// Falls through to HTML fallback, stored config not served on unauth server
+		assert.Contains(t, rec.Body.String(), "<html>")
+		assert.NotContains(t, rec.Body.String(), "custom body")
+	})
+
 	t.Run("session_stored_with_body", func(t *testing.T) {
 		srv := testServerWithStorage(t, func(c *Config) {
 			c.Auth = true
