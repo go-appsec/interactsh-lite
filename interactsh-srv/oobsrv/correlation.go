@@ -40,7 +40,6 @@ type Match struct {
 // onMatch receives (candidate, label) for each hit. Return false to stop.
 func scanLabels(input string, cidLength int, lookup func(string) bool, onMatch func(candidate, label string) bool) {
 	windowSize := cidLength + minNonceLength
-	var found bool
 
 	for remaining := input; remaining != ""; {
 		var label string
@@ -56,16 +55,11 @@ func scanLabels(input string, cidLength int, lookup func(string) bool, onMatch f
 				continue
 			}
 			if lookup(candidate) {
-				found = true
 				if !onMatch(candidate, label) {
 					return
 				}
 			}
 		}
-	}
-
-	if found {
-		return
 	}
 
 	// bare ID fallback
@@ -90,6 +84,9 @@ func MatchCorrelationID(input string, cidLength int, domains []string, lookup fu
 	var matches []Match
 
 	scanLabels(input, cidLength, lookup, func(candidate, _ string) bool {
+		if matchesContain(matches, candidate) {
+			return true
+		}
 		matches = append(matches, Match{UniqueID: candidate})
 		return true
 	})

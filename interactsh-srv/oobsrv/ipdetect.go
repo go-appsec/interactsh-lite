@@ -42,47 +42,44 @@ func ClassifyIPs(ips []string) ServerIPs {
 	return result
 }
 
-// DetectIPs discovers public IPv4 and IPv6 addresses. Errors only if both fail.
+// DetectIPs discovers public IPv4 and IPv6 addresses. Errors only if both
+// fail; partial failure returns the detected family.
 func DetectIPs(ctx context.Context, logger *slog.Logger) (ServerIPs, error) {
 	var result ServerIPs
 	var v4err, v6err error
 
 	if ip, err := detectIPv4(ctx); err != nil {
 		v4err = err
-		logger.Debug("ipv4 auto-detection failed", "error", err)
+		logger.Warn("ipv4 auto-detection failed", "error", err)
 	} else {
 		result.IPv4 = []net.IP{ip}
 	}
 
 	if ip, err := detectIPv6(ctx); err != nil {
 		v6err = err
-		logger.Debug("ipv6 auto-detection failed", "error", err)
+		logger.Warn("ipv6 auto-detection failed", "error", err)
 	} else {
 		result.IPv6 = []net.IP{ip}
 	}
 
 	if v4err != nil && v6err != nil {
-		return result, fmt.Errorf("ip auto-detection failed: %w", errors.Join(v4err, v6err))
+		return result, fmt.Errorf("ip auto-detection failed: %w (configure ips in config)", errors.Join(v4err, v6err))
 	}
 	return result, nil
 }
 
 func detectIPv4(ctx context.Context) (net.IP, error) {
-	if ip, err := detectIPExternal(ctx, "tcp4"); err == nil {
-		if validateLocalIP(ip) {
-			return ip, nil
-		}
+	if ip, err := detectIPExternal(ctx, "tcp4"); err == nil && validateLocalIP(ip) {
+		return ip, nil
 	}
-	return detectIPUDP(ctx, "udp4")
+	return detectPublicUDP(ctx, "udp4")
 }
 
 func detectIPv6(ctx context.Context) (net.IP, error) {
-	if ip, err := detectIPExternal(ctx, "tcp6"); err == nil {
-		if validateLocalIP(ip) {
-			return ip, nil
-		}
+	if ip, err := detectIPExternal(ctx, "tcp6"); err == nil && validateLocalIP(ip) {
+		return ip, nil
 	}
-	return detectIPUDP(ctx, "udp6")
+	return detectPublicUDP(ctx, "udp6")
 }
 
 // detectIPExternal queries an external service for the public IP.
@@ -151,7 +148,22 @@ func validateLocalIP(ip net.IP) bool {
 	return false
 }
 
-// detectIPUDP discovers outbound IP via UDP socket. No data is sent.
+// isUsablePublicIP checks that an IP is globally routable and not private.
+func isUsablePublicIP(ip net.IP) bool {
+	return ip.IsGlobalUnicast() && !ip.IsPrivate()
+}
+
+// detectPublicUDP accepts the UDP source address only when it's a usable public IP.
+func detectPublicUDP(ctx context.Context, network string) (net.IP, error) {
+	ip, err := detectIPUDP(ctx, network)
+	if err != nil {
+		return nil, err
+	}
+	if !isUsablePublicIP(ip) || !validateLocalIP(ip) {
+		return nil, fmt.Errorf("udp source %v is not a usable public ip", ip)
+	}
+	return ip, nil
+}
 func detectIPUDP(ctx context.Context, network string) (net.IP, error) {
 	var dialer net.Dialer
 	conn, err := dialer.DialContext(ctx, network, udpTarget)

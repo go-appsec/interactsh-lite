@@ -601,9 +601,9 @@ func NewDiskStorage(cfg Config, logger *slog.Logger) (*diskStorage, error) {
 
 func (d *diskStorage) AppendInteraction(correlationID string, interaction []byte) error {
 	d.mu.RLock()
-	session, ok := d.sessions[correlationID]
-	d.mu.RUnlock()
+	defer d.mu.RUnlock()
 
+	session, ok := d.sessions[correlationID]
 	if !ok {
 		d.misses.Add(1)
 		return nil

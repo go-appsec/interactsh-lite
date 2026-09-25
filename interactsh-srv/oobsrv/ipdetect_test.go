@@ -159,7 +159,30 @@ func TestDetectIPv4(t *testing.T) {
 	udpTarget = pc.LocalAddr().String()
 	t.Cleanup(func() { udpTarget = oldUDP })
 
-	ip, err := detectIPv4(t.Context())
-	require.NoError(t, err)
-	assert.True(t, validateLocalIP(ip), "expected a local interface IP, got %s", ip)
+	// External check is rejected (IP not on a local interface) and the UDP
+	// source is loopback, so detection must fail rather than advertise a
+	// non-public address.
+	_, err = detectIPv4(t.Context())
+	require.Error(t, err)
+}
+
+func TestIsUsablePublicIP(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		ip   net.IP
+		want bool
+	}{
+		{"public_v4", net.ParseIP("93.184.216.34"), true},
+		{"private_rfc1918", net.ParseIP("10.0.0.1"), false},
+		{"loopback", net.ParseIP("127.0.0.1"), false},
+		{"link_local", net.ParseIP("169.254.3.4"), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, isUsablePublicIP(tt.ip))
+		})
+	}
 }

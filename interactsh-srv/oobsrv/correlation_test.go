@@ -59,6 +59,21 @@ func TestMatchCorrelationID(t *testing.T) {
 		assert.Equal(t, testCorrelationID, matches[0].UniqueID)
 	})
 
+	t.Run("tier2_kept_per_label", func(t *testing.T) {
+		const id1 = "aaaabbbbccccddddeeee"
+		const id2 = "11112222333344445555"
+		lookup := lookupSet(id1, id2)
+		// id1 matches a combined window, id2 is an exact-length bare label.
+		input := id1 + "abc." + id2 + ".sub.example.com"
+
+		matches := MatchCorrelationID(input, cidLength, domains, lookup)
+		require.Len(t, matches, 2)
+
+		ids := []string{matches[0].UniqueID, matches[1].UniqueID}
+		assert.Contains(t, ids, id1)
+		assert.Contains(t, ids, id2)
+	})
+
 	t.Run("multiple_matches_different_labels", func(t *testing.T) {
 		const id1 = "aaaabbbbccccddddeeee"
 		const id2 = "11112222333344445555"
