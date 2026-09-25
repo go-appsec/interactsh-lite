@@ -85,6 +85,9 @@ type Server struct {
 	httpIndex           []byte // cached --http-index file content
 
 	ftpTempDir string // auto-created FTP temp dir; empty if user-supplied
+
+	// user-agent registration tracker
+	uaTracker *userAgentTracker
 }
 
 // New creates a Server and configures the HTTP handler chain.
@@ -114,6 +117,8 @@ func New(cfg Config, logger *slog.Logger) (*Server, error) {
 		customRecords: records,
 		acmeStore:     newACMEStore(),
 	}
+
+	s.uaTracker = newUserAgentTracker(logger, uaReportThreshold, uaCheckInterval)
 
 	// setup storage
 	if s.cfg.Disk {
@@ -192,6 +197,11 @@ func (s *Server) Start(ctx context.Context) error {
 		if err := s.startPprof(ctx); err != nil {
 			return fmt.Errorf("pprof: %w", err)
 		}
+	}
+
+	s.addService(s.uaTracker)
+	if err := s.uaTracker.Start(ctx); err != nil {
+		return fmt.Errorf("user-agent report: %w", err)
 	}
 
 	if err := s.resolveIPs(ctx); err != nil {

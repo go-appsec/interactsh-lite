@@ -110,6 +110,8 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.uaTracker.record(r.UserAgent())
+
 	s.writeJSON(w, http.StatusOK, map[string]string{
 		"message": "registration successful",
 	})
