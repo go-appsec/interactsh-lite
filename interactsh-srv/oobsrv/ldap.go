@@ -228,6 +228,9 @@ func (s *Server) handleLDAPAbandon(_ ldapserver.ResponseWriter, m *ldapserver.Me
 // ldapStartTLSTimeout bounds a single StartTLS handshake.
 const ldapStartTLSTimeout = 10 * time.Second
 
+// startTLSDone marks a connection that has already negotiated TLS.
+var startTLSDone = struct{}{}
+
 // handleLDAPStartTLS returns a handler for StartTLS extended operations.
 func (s *Server) handleLDAPStartTLS(ctx context.Context) ldapserver.HandlerFunc {
 	return func(w ldapserver.ResponseWriter, m *ldapserver.Message) {
@@ -235,6 +238,15 @@ func (s *Server) handleLDAPStartTLS(ctx context.Context) ldapserver.HandlerFunc 
 
 		if s.cfg.LDAP && s.extraBucket != nil {
 			s.captureLDAPExtra("Type=Extended\nName=StartTLS\n", ldapRemoteAddr(m))
+		}
+
+		// RFC 4511: reject StartTLS once the stream is already TLS.
+		if m.Client.GetData() == startTLSDone {
+			s.logger.Debug("LDAP repeated StartTLS rejected")
+			res := ldapserver.NewExtendedResponse(ldapserver.LDAPResultOperationsError)
+			res.SetDiagnosticMessage("StartTLS not allowed on an established TLS session")
+			w.Write(res)
+			return
 		}
 
 		if s.tlsConfig == nil {
@@ -255,8 +267,11 @@ func (s *Server) handleLDAPStartTLS(ctx context.Context) ldapserver.HandlerFunc 
 		defer cancel()
 		if err := tlsConn.HandshakeContext(hctx); err != nil {
 			s.logger.Debug("LDAP StartTLS handshake failed", "error", err)
+			// Close the broken connection; a half-finished TLS stream is unusable.
+			_ = m.Client.GetConn().Close()
 			return
 		}
+		m.Client.SetData(startTLSDone)
 		m.Client.SetConn(tlsConn)
 	}
 }
