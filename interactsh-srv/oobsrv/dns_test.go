@@ -20,29 +20,50 @@ import (
 func TestACMEStore(t *testing.T) {
 	t.Parallel()
 
-	t.Run("set_and_get", func(t *testing.T) {
+	t.Run("add_and_get", func(t *testing.T) {
 		s := newACMEStore()
-		s.Set("example.com", "token123")
-		v, ok := s.Get("example.com")
-		assert.True(t, ok)
-		assert.Equal(t, "token123", v)
+		s.Add("example.com", "token123")
+		v := s.Get("example.com")
+		assert.Equal(t, []string{"token123"}, v)
 	})
 
-	t.Run("overwrite", func(t *testing.T) {
+	t.Run("append_deduplicates", func(t *testing.T) {
 		s := newACMEStore()
-		s.Set("example.com", "old")
-		s.Set("example.com", "new")
-		v, ok := s.Get("example.com")
-		assert.True(t, ok)
-		assert.Equal(t, "new", v)
+		s.Add("example.com", "token-a")
+		s.Add("example.com", "token-a")
+		v := s.Get("example.com")
+		assert.Equal(t, []string{"token-a"}, v)
+	})
+
+	t.Run("multiple_values_share_fqdn", func(t *testing.T) {
+		s := newACMEStore()
+		s.Add("example.com", "token-a")
+		s.Add("example.com", "token-b")
+		v := s.Get("example.com")
+		assert.ElementsMatch(t, []string{"token-a", "token-b"}, v)
+	})
+
+	t.Run("delete_keeps_siblings", func(t *testing.T) {
+		s := newACMEStore()
+		s.Add("example.com", "token-a")
+		s.Add("example.com", "token-b")
+		s.Delete("example.com", "token-a")
+		v := s.Get("example.com")
+		assert.Equal(t, []string{"token-b"}, v)
+	})
+
+	t.Run("delete_last_value_removes_key", func(t *testing.T) {
+		s := newACMEStore()
+		s.Add("example.com", "token-a")
+		s.Delete("example.com", "token-a")
+		assert.Empty(t, s.Get("example.com"))
 	})
 
 	t.Run("normalizes_fqdn", func(t *testing.T) {
 		s := newACMEStore()
-		s.Set("Example.COM.", "token")
-		v, ok := s.Get("example.com")
-		assert.True(t, ok)
-		assert.Equal(t, "token", v)
+		s.Add("Example.COM.", "token")
+		v := s.Get("example.com")
+		assert.Equal(t, []string{"token"}, v)
 	})
 }
 
@@ -688,7 +709,7 @@ func TestDNSACMEChallenge(t *testing.T) {
 
 	t.Run("txt_from_store", func(t *testing.T) {
 		srv, addr := testDNSServer(t)
-		srv.acmeStore.Set("_acme-challenge.test.com", "challenge-token")
+		srv.acmeStore.Add("_acme-challenge.test.com", "challenge-token")
 
 		r := queryDNS(t, addr, "_acme-challenge.test.com", dns.TypeTXT)
 		require.Len(t, r.Answer, 1)
@@ -697,9 +718,26 @@ func TestDNSACMEChallenge(t *testing.T) {
 		assert.Equal(t, []string{"challenge-token"}, txt.Txt)
 	})
 
+	t.Run("multiple_values_all_served", func(t *testing.T) {
+		srv, addr := testDNSServer(t)
+		srv.acmeStore.Add("_acme-challenge.test.com", "token-a")
+		srv.acmeStore.Add("_acme-challenge.test.com", "token-b")
+
+		r := queryDNS(t, addr, "_acme-challenge.test.com", dns.TypeTXT)
+		require.Len(t, r.Answer, 2)
+		got := make([]string, 0, len(r.Answer))
+		for _, rr := range r.Answer {
+			txt, ok := rr.(*dns.TXT)
+			require.True(t, ok)
+			require.Len(t, txt.Txt, 1)
+			got = append(got, txt.Txt[0])
+		}
+		assert.ElementsMatch(t, []string{"token-a", "token-b"}, got)
+	})
+
 	t.Run("not_captured", func(t *testing.T) {
 		srv, addr := testDNSServer(t)
-		srv.acmeStore.Set("_acme-challenge.test.com", "token")
+		srv.acmeStore.Add("_acme-challenge.test.com", "token")
 
 		// Register a session to check interaction storage
 		_, err := srv.storage.Register(t.Context(), testCorrelationID, &sharedRSAKey.PublicKey, "secret", nil)
@@ -768,7 +806,7 @@ func TestDNSACMEChallenge(t *testing.T) {
 				"_acme-challenge": {{Type: "A", Value: "10.0.0.1", TTL: 3600}},
 			}
 		})
-		srv.acmeStore.Set("_acme-challenge.test.com", "acme-wins")
+		srv.acmeStore.Add("_acme-challenge.test.com", "acme-wins")
 
 		r := queryDNS(t, addr, "_acme-challenge.test.com", dns.TypeTXT)
 		require.Len(t, r.Answer, 1)
@@ -779,7 +817,7 @@ func TestDNSACMEChallenge(t *testing.T) {
 
 	t.Run("nested_subdomain_challenge", func(t *testing.T) {
 		srv, addr := testDNSServer(t)
-		srv.acmeStore.Set("_acme-challenge.sub.test.com", "nested-token")
+		srv.acmeStore.Add("_acme-challenge.sub.test.com", "nested-token")
 
 		r := queryDNS(t, addr, "_acme-challenge.sub.test.com", dns.TypeTXT)
 		require.Len(t, r.Answer, 1)

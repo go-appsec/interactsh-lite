@@ -7,6 +7,7 @@ import (
 	"maps"
 	"net"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -106,38 +107,50 @@ func loadCustomRecords(path string) (customRecords, error) {
 }
 
 // acmeStore is a thread-safe store for ACME DNS-01 challenge TXT records.
+// Multiple values per FQDN are kept: concurrent challenges for a domain and
+// its wildcard share one FQDN with distinct tokens.
 type acmeStore struct {
 	mu      sync.RWMutex
-	records map[string]string
+	records map[string][]string
 }
 
 func newACMEStore() *acmeStore {
-	return &acmeStore{records: make(map[string]string)}
+	return &acmeStore{records: make(map[string][]string)}
 }
 
-// Set stores a challenge TXT record. FQDN is normalized.
-func (s *acmeStore) Set(fqdn, value string) {
+// Add appends a challenge TXT value, deduplicated.
+func (s *acmeStore) Add(fqdn, value string) {
+	fqdn = normalizeFQDN(fqdn)
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.records[normalizeFQDN(fqdn)] = value
+	if !slices.Contains(s.records[fqdn], value) {
+		s.records[fqdn] = append(s.records[fqdn], value)
+	}
 }
 
-// Get returns a challenge TXT record.
-func (s *acmeStore) Get(fqdn string) (string, bool) {
+// Get returns all challenge TXT values for fqdn.
+func (s *acmeStore) Get(fqdn string) []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	v, ok := s.records[normalizeFQDN(fqdn)]
-	return v, ok
+	return slices.Clone(s.records[normalizeFQDN(fqdn)])
 }
 
-// Delete removes a challenge TXT record.
-func (s *acmeStore) Delete(fqdn string) {
+// Delete removes a single challenge TXT value, keeping sibling values.
+func (s *acmeStore) Delete(fqdn, value string) {
+	fqdn = normalizeFQDN(fqdn)
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	delete(s.records, normalizeFQDN(fqdn))
+	values := slices.DeleteFunc(s.records[fqdn], func(v string) bool { return v == value })
+	if len(values) == 0 {
+		delete(s.records, fqdn)
+		return
+	}
+	s.records[fqdn] = values
 }
 
 // normalizeFQDN lowercases and strips trailing dot.
@@ -381,7 +394,7 @@ func (s *Server) buildACMEResponse(m *dns.Msg, qname string, qtype uint16, domai
 	case dns.TypeTXT:
 		// Look up in ACME store (normalize without trailing dot)
 		acmeFQDN := normalizeFQDN(qname)
-		if value, ok := s.acmeStore.Get(acmeFQDN); ok {
+		for _, value := range s.acmeStore.Get(acmeFQDN) {
 			m.Answer = append(m.Answer, &dns.TXT{
 				Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: 0},
 				Txt: []string{value},

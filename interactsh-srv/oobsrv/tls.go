@@ -80,7 +80,8 @@ var defaultACMEResolvers = []string{
 }
 
 // acmeProvider bridges certmagic's DNS-01 solver to the in-memory ACME challenge store.
-// The DNS handler reads from the store (dns.go), no extra wiring needed.
+// Follows libdns append/delete semantics so concurrent challenges for a domain and
+// its wildcard (same FQDN, distinct tokens) never clobber each other.
 type acmeProvider struct {
 	store *acmeStore
 }
@@ -96,7 +97,7 @@ func (p *acmeProvider) AppendRecords(ctx context.Context, zone string, recs []li
 			continue
 		}
 		fqdn := toFQDN(rr.Name, zone)
-		p.store.Set(fqdn, rr.Data)
+		p.store.Add(fqdn, rr.Data)
 		appended = append(appended, rec)
 	}
 	return appended, nil
@@ -110,7 +111,7 @@ func (p *acmeProvider) DeleteRecords(ctx context.Context, zone string, recs []li
 			continue
 		}
 		fqdn := toFQDN(rr.Name, zone)
-		p.store.Delete(fqdn)
+		p.store.Delete(fqdn, rr.Data)
 		deleted = append(deleted, rec)
 	}
 	return deleted, nil

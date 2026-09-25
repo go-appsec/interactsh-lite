@@ -92,9 +92,24 @@ func TestACMEProviderAppendRecords(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, result, 1)
 
-		v, ok := store.Get("_acme-challenge.example.com")
-		assert.True(t, ok)
-		assert.Equal(t, "token123", v)
+		assert.Equal(t, []string{"token123"}, store.Get("_acme-challenge.example.com"))
+	})
+
+	t.Run("appends_second_challenge_token", func(t *testing.T) {
+		store := newACMEStore()
+		provider := &acmeProvider{store: store}
+
+		// apex and wildcard challenges share one FQDN with distinct tokens
+		for _, token := range []string{"token-apex", "token-wild"} {
+			recs := []libdns.Record{
+				libdns.TXT{Name: "_acme-challenge", Text: token},
+			}
+			result, err := provider.AppendRecords(t.Context(), "example.com.", recs)
+			require.NoError(t, err)
+			assert.Len(t, result, 1)
+		}
+
+		assert.ElementsMatch(t, []string{"token-apex", "token-wild"}, store.Get("_acme-challenge.example.com"))
 	})
 
 	t.Run("ignores_non_txt", func(t *testing.T) {
@@ -115,7 +130,7 @@ func TestACMEProviderDeleteRecords(t *testing.T) {
 
 	t.Run("removes_record", func(t *testing.T) {
 		store := newACMEStore()
-		store.Set("_acme-challenge.example.com", "token123")
+		store.Add("_acme-challenge.example.com", "token123")
 		provider := &acmeProvider{store: store}
 
 		recs := []libdns.Record{
@@ -125,8 +140,24 @@ func TestACMEProviderDeleteRecords(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, result, 1)
 
-		_, ok := store.Get("_acme-challenge.example.com")
-		assert.False(t, ok)
+		assert.Empty(t, store.Get("_acme-challenge.example.com"))
+	})
+
+	t.Run("removes_only_target_value", func(t *testing.T) {
+		store := newACMEStore()
+		store.Add("_acme-challenge.example.com", "token-apex")
+		store.Add("_acme-challenge.example.com", "token-wild")
+		provider := &acmeProvider{store: store}
+
+		recs := []libdns.Record{
+			libdns.TXT{Name: "_acme-challenge", Text: "token-apex"},
+		}
+		result, err := provider.DeleteRecords(t.Context(), "example.com.", recs)
+		require.NoError(t, err)
+		assert.Len(t, result, 1)
+
+		// sibling challenge token must survive cleanup of the other order
+		assert.Equal(t, []string{"token-wild"}, store.Get("_acme-challenge.example.com"))
 	})
 
 	t.Run("ignores_non_txt_on_delete", func(t *testing.T) {
@@ -134,7 +165,7 @@ func TestACMEProviderDeleteRecords(t *testing.T) {
 		p := &acmeProvider{store: store}
 
 		// Store a TXT record first
-		store.Set("_acme-challenge.example.com", "token123")
+		store.Add("_acme-challenge.example.com", "token123")
 
 		// Delete with mix of TXT and non-TXT records
 		recs := []libdns.Record{
@@ -149,8 +180,7 @@ func TestACMEProviderDeleteRecords(t *testing.T) {
 		assert.Equal(t, "TXT", deleted[0].RR().Type)
 
 		// Store should be empty for the key
-		_, ok := store.Get("_acme-challenge.example.com")
-		assert.False(t, ok)
+		assert.Empty(t, store.Get("_acme-challenge.example.com"))
 	})
 }
 
