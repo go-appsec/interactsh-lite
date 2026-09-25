@@ -571,6 +571,27 @@ func TestSaveLoadSession(t *testing.T) {
 		assert.Equal(t, response, loaded.response)
 	})
 
+	t.Run("preserves_nonce_length", func(t *testing.T) {
+		server := newMockServer(t)
+
+		client, err := New(t.Context(), Options{
+			ServerURLs:               []string{server.URL},
+			DisableKeepAlive:         true,
+			CorrelationIdNonceLength: 9,
+		})
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = client.Close() })
+
+		sessionPath := filepath.Join(t.TempDir(), "session.yaml")
+		require.NoError(t, client.SaveSession(sessionPath))
+
+		loaded, err := LoadSession(t.Context(), sessionPath)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = loaded.Close() })
+
+		assert.Equal(t, 9, loaded.correlationIDNonceLength)
+	})
+
 	t.Run("omits_response_when_unset", func(t *testing.T) {
 		server := newMockServer(t)
 

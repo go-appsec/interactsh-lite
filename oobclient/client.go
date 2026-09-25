@@ -85,6 +85,7 @@ type Client struct {
 	state               clientState
 	pollCancel          context.CancelFunc
 	keepAliveCancel     context.CancelFunc
+	keepAliveDone       chan struct{}
 	keepAliveInterval   time.Duration
 	disableHTTPFallback bool
 	response            *ResponseConfig
@@ -333,7 +334,11 @@ func (c *Client) startKeepAlive(ctx context.Context) { // TODO - update in next 
 	ctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	c.keepAliveCancel = cancel
 
+	done := make(chan struct{})
+	c.keepAliveDone = done
+
 	go func() {
+		defer close(done)
 		ticker := time.NewTicker(c.keepAliveInterval)
 		defer ticker.Stop()
 
@@ -611,12 +616,13 @@ func (c *Client) IsClosed() bool {
 // Close is safe to call multiple times; subsequent calls return nil.
 func (c *Client) Close() error {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	if c.state == stateClosed {
+		c.mu.Unlock()
 		return nil
 	}
 
+	var keepAliveDone chan struct{}
 	if c.pollCancel != nil {
 		c.pollCancel()
 		c.pollCancel = nil
@@ -624,8 +630,17 @@ func (c *Client) Close() error {
 	if c.keepAliveCancel != nil {
 		c.keepAliveCancel()
 		c.keepAliveCancel = nil
+		keepAliveDone = c.keepAliveDone
 	}
 	c.state = stateClosed
+
+	// Release the lock before joining so a keep-alive goroutine blocked on
+	// RLock can observe closed and exit.
+	c.mu.Unlock()
+
+	if keepAliveDone != nil {
+		<-keepAliveDone // wait for any in-flight re-registration to finish
+	}
 
 	return c.performDeregistration()
 }
@@ -683,13 +698,14 @@ func (c *Client) SaveSession(path string) error {
 	privateKeyDER := x509.MarshalPKCS1PrivateKey(c.privateKey)
 
 	session := sessionInfo{
-		ServerURL:     c.serverURL.String(),
-		Token:         c.token,
-		PrivateKey:    string(privateKeyDER),
-		CorrelationID: c.correlationID,
-		SecretKey:     c.secretKey,
-		PublicKey:     c.publicKeyB64,
-		Response:      c.response,
+		ServerURL:              c.serverURL.String(),
+		Token:                  c.token,
+		PrivateKey:             string(privateKeyDER),
+		CorrelationID:          c.correlationID,
+		SecretKey:              c.secretKey,
+		PublicKey:              c.publicKeyB64,
+		Response:               c.response,
+		CorrelationNonceLength: c.correlationIDNonceLength,
 	}
 
 	data, err := yaml.Marshal(session)
@@ -746,6 +762,11 @@ func LoadSession(ctx context.Context, path string, opts ...Options) (*Client, er
 	httpTimeout := DefaultOptions.HTTPTimeout
 	keepAliveInterval := DefaultOptions.KeepAliveInterval
 	correlationIDNonceLength := DefaultOptions.CorrelationIdNonceLength
+	if session.CorrelationNonceLength > 0 {
+		// Restore the nonce length used when saved so a loaded client keeps
+		// producing payload URLs in the same format. An explicit option overrides.
+		correlationIDNonceLength = session.CorrelationNonceLength
+	}
 	var disableHTTPFallback bool
 	var httpClient *http.Client
 
@@ -821,13 +842,14 @@ type pollResponse struct {
 }
 
 type sessionInfo struct {
-	ServerURL     string          `yaml:"server-url"`
-	Token         string          `yaml:"server-token"`
-	PrivateKey    string          `yaml:"private-key"`
-	CorrelationID string          `yaml:"correlation-id"`
-	SecretKey     string          `yaml:"secret-key"`
-	PublicKey     string          `yaml:"public-key"`
-	Response      *ResponseConfig `yaml:"response,omitempty"`
+	ServerURL              string          `yaml:"server-url"`
+	Token                  string          `yaml:"server-token"`
+	PrivateKey             string          `yaml:"private-key"`
+	CorrelationID          string          `yaml:"correlation-id"`
+	SecretKey              string          `yaml:"secret-key"`
+	PublicKey              string          `yaml:"public-key"`
+	Response               *ResponseConfig `yaml:"response,omitempty"`
+	CorrelationNonceLength int             `yaml:"correlation-nonce-length"`
 }
 
 func encodePublicKey(pubKey *rsa.PublicKey) (string, error) {
