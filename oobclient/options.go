@@ -142,7 +142,7 @@ func newSecureHTTPClient(timeout time.Duration) *http.Client {
 				MaxIdleConns:          10,
 				MaxIdleConnsPerHost:   2,
 			},
-			userAgent: "Mozilla/5.0 (compatible; go-appsec/interactsh-lite@" + Version + ")",
+			userAgent: "go-appsec/interactsh-lite@" + Version,
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse // Do not follow redirects
