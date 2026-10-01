@@ -237,6 +237,10 @@ func (c *Client) tryRegisterServers(ctx context.Context, serverURLs []string) er
 		}
 
 		if err := c.tryRegisterServer(ctx, server); err != nil {
+			// Auth is caller config; every server will reject the same token
+			if errors.Is(err, ErrUnauthorized) {
+				return err
+			}
 			errs = append(errs, fmt.Errorf("%s: %w", server, err))
 			if ips, lookupErr := net.DefaultResolver.LookupHost(ctx, server); lookupErr == nil {
 				failedIPs = append(failedIPs, ips...)

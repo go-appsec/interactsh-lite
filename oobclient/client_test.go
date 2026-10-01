@@ -848,7 +848,28 @@ func TestNew(t *testing.T) {
 			DisableKeepAlive: true,
 		})
 		require.ErrorIs(t, err, ErrUnauthorized)
-		assert.Contains(t, err.Error(), "failed to register with any server")
+	})
+
+	t.Run("unauthorized_stops_server_list", func(t *testing.T) {
+		var secondHit atomic.Bool
+		unauthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusUnauthorized)
+		}))
+		t.Cleanup(unauthServer.Close)
+
+		successServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			secondHit.Store(true)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"message":"registration successful"}`))
+		}))
+		t.Cleanup(successServer.Close)
+
+		_, err := New(t.Context(), Options{
+			ServerURLs:       []string{unauthServer.URL, successServer.URL},
+			DisableKeepAlive: true,
+		})
+		require.ErrorIs(t, err, ErrUnauthorized)
+		assert.False(t, secondHit.Load())
 	})
 
 	t.Run("sends_valid_registration_request", func(t *testing.T) {
