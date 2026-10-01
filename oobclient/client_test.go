@@ -851,25 +851,21 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("unauthorized_stops_server_list", func(t *testing.T) {
-		var secondHit atomic.Bool
+		// Same URL twice so the round-robin start index cannot change the
+		// expected request count; a missing early return would hit it twice.
+		var hits atomic.Int32
 		unauthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hits.Add(1)
 			w.WriteHeader(http.StatusUnauthorized)
 		}))
 		t.Cleanup(unauthServer.Close)
 
-		successServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			secondHit.Store(true)
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"message":"registration successful"}`))
-		}))
-		t.Cleanup(successServer.Close)
-
 		_, err := New(t.Context(), Options{
-			ServerURLs:       []string{unauthServer.URL, successServer.URL},
+			ServerURLs:       []string{unauthServer.URL, unauthServer.URL},
 			DisableKeepAlive: true,
 		})
 		require.ErrorIs(t, err, ErrUnauthorized)
-		assert.False(t, secondHit.Load())
+		assert.EqualValues(t, 1, hits.Load())
 	})
 
 	t.Run("sends_valid_registration_request", func(t *testing.T) {
