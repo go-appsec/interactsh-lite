@@ -19,7 +19,7 @@ require (
 	github.com/vjeantet/ldapserver v1.0.2-0.20260218215457-e117373377c0
 	go.uber.org/zap v1.28.0
 	goftp.io/server/v2 v2.0.3
-	golang.org/x/net v0.59.0
+	golang.org/x/net v0.60.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
