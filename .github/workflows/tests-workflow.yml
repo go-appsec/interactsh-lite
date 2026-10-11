@@ -66,8 +66,8 @@ jobs:
             exit 1
           fi
 
-  test:
-    name: Verify Unit Tests
+  test-client:
+    name: Verify Client Unit Tests
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -83,5 +83,24 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
 
-      - name: Run unit tests
-        run: make test
+      - name: Run client unit tests
+        run: go test -short -race ./...
+
+  test-server:
+    name: Verify Server Unit Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go:
+        - '1.27'
+        - '1.26'
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Go ${{ matrix.go }}
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Run server unit tests
+        run: cd interactsh-srv && go test -short -race ./...
