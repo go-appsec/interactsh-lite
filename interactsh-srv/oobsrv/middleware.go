@@ -165,9 +165,16 @@ func AuthMiddleware(enabled bool, token string, next http.Handler) http.Handler 
 }
 
 // LoggerMiddleware captures HTTP request/response data for interaction storage.
+// Request bodies are truncated at maxBodyBytes before the dump is taken.
 // Wraps the handler with a response recorder and calls the callback before forwarding.
-func LoggerMiddleware(originIPHeader string, onInteraction InteractionCallback, next http.Handler) http.Handler {
+func LoggerMiddleware(originIPHeader string, maxBodyBytes int64, onInteraction InteractionCallback, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Cap the stored dump: bodies beyond maxBodyBytes are dropped, and the
+		// request still completes so the interaction is not lost.
+		if r.Body != nil && maxBodyBytes > 0 {
+			r.Body = io.NopCloser(io.LimitReader(r.Body, maxBodyBytes))
+		}
+
 		// Dump request before handler to preserve body
 		rawReq, _ := httputil.DumpRequest(r, true)
 

@@ -177,7 +177,7 @@ func New(cfg Config, logger *slog.Logger) (*Server, error) {
 	h := InteractionCORSMiddleware(http.HandlerFunc(s.serveDefault))
 	h = ResponseHeadersMiddleware(serverHeader, s.cfg.Version, s.cfg.DisableVersion, false, h)
 	h = s.hostnameMiddleware(h)
-	h = LoggerMiddleware(s.cfg.OriginIPHeader, s.onHTTPInteraction, h)
+	h = LoggerMiddleware(s.cfg.OriginIPHeader, s.cfg.maxBodyBytes(), s.onHTTPInteraction, h)
 	mux.Handle("/", h)
 
 	// Top-level: max request size wraps the entire mux

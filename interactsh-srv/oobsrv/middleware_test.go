@@ -301,7 +301,7 @@ func TestLoggerMiddleware(t *testing.T) {
 			ch <- capture{rawReq, rawResp, remoteAddr}
 		}
 
-		h := LoggerMiddleware("", callback, inner)
+		h := LoggerMiddleware("", 0, callback, inner)
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test", strings.NewReader("request body"))
 		req.RemoteAddr = "192.168.1.1:12345"
@@ -329,7 +329,7 @@ func TestLoggerMiddleware(t *testing.T) {
 			ch <- remoteAddr
 		}
 
-		h := LoggerMiddleware("X-Real-IP", callback, inner)
+		h := LoggerMiddleware("X-Real-IP", 0, callback, inner)
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.RemoteAddr = "10.0.0.1:1234"
@@ -351,7 +351,7 @@ func TestLoggerMiddleware(t *testing.T) {
 		}
 
 		corsInner := InteractionCORSMiddleware(inner)
-		h := LoggerMiddleware("", callback, corsInner)
+		h := LoggerMiddleware("", 0, callback, corsInner)
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodOptions, "/test", nil)
 		req.RemoteAddr = "1.2.3.4:5"
@@ -362,7 +362,7 @@ func TestLoggerMiddleware(t *testing.T) {
 	})
 
 	t.Run("nil_callback", func(t *testing.T) {
-		h := LoggerMiddleware("", nil, inner)
+		h := LoggerMiddleware("", 0, nil, inner)
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		h.ServeHTTP(rec, req)
@@ -378,7 +378,7 @@ func TestLoggerMiddleware(t *testing.T) {
 			w.WriteHeader(http.StatusCreated) // no-op: wroteHeader already true
 		})
 
-		h := LoggerMiddleware("", nil, inner)
+		h := LoggerMiddleware("", 0, nil, inner)
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		h.ServeHTTP(rec, req)
@@ -386,6 +386,47 @@ func TestLoggerMiddleware(t *testing.T) {
 		// Implicit WriteHeader(200) from Write wins
 		assert.Equal(t, http.StatusOK, rec.Code)
 		assert.Equal(t, "body", rec.Body.String())
+	})
+
+	t.Run("truncates_dump_at_max_body_bytes", func(t *testing.T) {
+		type capture struct{ req string }
+		ch := make(chan capture, 1)
+		callback := func(_ *http.Request, rawReq, _, _, _, _ string) {
+			ch <- capture{rawReq}
+		}
+
+		h := LoggerMiddleware("", 1024, callback, inner)
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test", strings.NewReader(strings.Repeat("<", 64*1024)))
+		h.ServeHTTP(rec, req)
+
+		select {
+		case got := <-ch:
+			assert.Equal(t, 1024, strings.Count(got.req, "<"))
+			assert.Equal(t, http.StatusCreated, rec.Code)
+		case <-time.After(time.Second):
+			t.Fatal("callback not called")
+		}
+	})
+
+	t.Run("unlimited_when_max_body_bytes_zero", func(t *testing.T) {
+		type capture struct{ req string }
+		ch := make(chan capture, 1)
+		callback := func(_ *http.Request, rawReq, _, _, _, _ string) {
+			ch <- capture{rawReq}
+		}
+
+		h := LoggerMiddleware("", 0, callback, inner)
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test", strings.NewReader(strings.Repeat("<", 64*1024)))
+		h.ServeHTTP(rec, req)
+
+		select {
+		case got := <-ch:
+			assert.Equal(t, 64*1024, strings.Count(got.req, "<"))
+		case <-time.After(time.Second):
+			t.Fatal("callback not called")
+		}
 	})
 }
 

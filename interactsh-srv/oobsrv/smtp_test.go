@@ -2,6 +2,7 @@ package oobsrv
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -197,6 +198,10 @@ func TestOnSMTPData(t *testing.T) {
 		assert.Equal(t, testCorrelationID, int2.UniqueID)
 		assert.Equal(t, testCorrelationID+nonce1, int1.FullId)
 		assert.Equal(t, testCorrelationID+nonce2, int2.FullId)
+		// raw message kept only for the first unique ID per correlation ID
+		assert.Equal(t, "body", int1.RawRequest)
+		assert.Empty(t, int2.RawRequest)
+		assert.Equal(t, "y@"+testCorrelationID+nonce2+"."+testDomain, int2.SMTPTo)
 	})
 
 	t.Run("no_at_in_recipient", func(t *testing.T) {
@@ -269,6 +274,47 @@ func TestOnSMTPData(t *testing.T) {
 		interactions, err := testGetAndClearInteractions(t, srv.storage, testCorrelationID, "secret")
 		require.NoError(t, err)
 		assert.Nil(t, interactions)
+	})
+
+	t.Run("duplicate_recipient_stored_once", func(t *testing.T) {
+		srv := testServerWithStorage(t)
+		pubKey := &sharedRSAKey.PublicKey
+		aesKey, err := srv.storage.Register(t.Context(), testCorrelationID, pubKey, "secret", nil)
+		require.NoError(t, err)
+
+		rcpt := "user@" + testCorrelationID + testNonce + "." + testDomain
+		srv.onSMTPData("sender@example.com", []string{rcpt, rcpt, rcpt}, []byte("email body"), "10.0.0.1:25")
+
+		interactions, err := testGetAndClearInteractions(t, srv.storage, testCorrelationID, "secret")
+		require.NoError(t, err)
+		require.Len(t, interactions, 1)
+
+		decrypted := decryptTestInteraction(t, interactions[0], aesKey)
+		assert.Contains(t, decrypted, "email body")
+	})
+
+	t.Run("wildcard_once_per_domain", func(t *testing.T) {
+		srv := testServerWithStorage(t, func(c *Config) {
+			c.Wildcard = true
+			c.Auth = true
+			c.Token = "tok"
+		})
+		pubKey := &sharedRSAKey.PublicKey
+		_, err := srv.storage.Register(t.Context(), testCorrelationID, pubKey, "s1", nil)
+		require.NoError(t, err)
+		_, err = srv.storage.Register(t.Context(), testCorrelationID2, pubKey, "s2", nil)
+		require.NoError(t, err)
+
+		rcpt1 := "a@" + testCorrelationID + testNonce + "." + testDomain
+		rcpt2 := "b@" + testCorrelationID2 + testNonce + "." + testDomain
+		srv.onSMTPData("sender@example.com", []string{rcpt1, rcpt1, rcpt2}, []byte("email body"), "10.0.0.1:25")
+
+		// one message, one domain -> single wildcard entry despite 3 RCPT lines
+		data := srv.tldBuckets[testDomain].ReadFrom("consumer1")
+		require.Len(t, data, 1)
+		var bucketInteraction InteractionType
+		require.NoError(t, json.Unmarshal(data[0], &bucketInteraction))
+		assert.Equal(t, "email body", bucketInteraction.RawRequest)
 	})
 
 	t.Run("ipv6_remote_address", func(t *testing.T) {
@@ -390,6 +436,34 @@ func TestSMTPSession(t *testing.T) {
 		assert.Equal(t, "second@example.com", session.from)
 		require.Len(t, session.recipients, 1)
 		assert.Equal(t, "rcpt2@example.com", session.recipients[0])
+	})
+
+	t.Run("data_truncates_at_max_body", func(t *testing.T) {
+		srv := testServerWithStorage(t, func(c *Config) {
+			c.MaxBodySize = 1 // 1MB cap
+		})
+		pubKey := &sharedRSAKey.PublicKey
+		aesKey, err := srv.storage.Register(t.Context(), testCorrelationID, pubKey, "secret", nil)
+		require.NoError(t, err)
+
+		rcpt := "user@" + testCorrelationID + testNonce + "." + testDomain
+		session := &smtpSession{
+			server:     srv,
+			remoteAddr: "10.0.0.1:25",
+			from:       "sender@example.com",
+			recipients: []string{rcpt},
+		}
+		// full message is accepted, only the stored body is capped
+		require.NoError(t, session.Data(bytes.NewReader(bytes.Repeat([]byte("~"), 2*1024*1024))))
+
+		interactions, err := testGetAndClearInteractions(t, srv.storage, testCorrelationID, "secret")
+		require.NoError(t, err)
+		require.Len(t, interactions, 1)
+
+		decrypted := decryptTestInteraction(t, interactions[0], aesKey)
+		var interaction InteractionType
+		require.NoError(t, json.Unmarshal([]byte(decrypted), &interaction))
+		assert.Len(t, interaction.RawRequest, 1024*1024)
 	})
 }
 
@@ -1001,4 +1075,16 @@ func TestStartSMTP(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSMTPServerLimits(t *testing.T) {
+	t.Parallel()
+
+	srv := testServerWithStorage(t)
+	s := srv.newSMTPServer(&smtpBackend{server: srv}, testDomain, nil, false)
+	assert.Equal(t, smtpMaxRecipients, s.MaxRecipients)
+	assert.Equal(t, smtpReadTimeout, s.ReadTimeout)
+	assert.Equal(t, smtpWriteTimeout, s.WriteTimeout)
+	// MaxMessageBytes stays unset so SIZE 0 is advertised
+	assert.Zero(t, s.MaxMessageBytes)
 }

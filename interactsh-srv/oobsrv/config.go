@@ -17,6 +17,9 @@ const (
 // defaultEvictionDays is the session TTL in days used when Eviction is unset (<1).
 const defaultEvictionDays = 30
 
+// defaultMaxBodySizeMB caps stored interaction bodies when MaxBodySize is unset.
+const defaultMaxBodySizeMB = 8
+
 // Config holds all server configuration. Field values are populated by YAML
 // config loading and CLI flag overrides in the main package.
 type Config struct {
@@ -37,6 +40,7 @@ type Config struct {
 	PrivKeyFile         string   `yaml:"privkey"`
 	OriginIPHeader      string   `yaml:"origin-ip-header"`
 	MaxRequestSize      int      `yaml:"max-request-size"`
+	MaxBodySize         int      `yaml:"max-body-size"`
 
 	// Config flags
 	Resolvers           []string `yaml:"resolvers"`
@@ -122,6 +126,7 @@ func DefaultConfig() Config {
 		FTPPort:               21,
 		FTPSPort:              990,
 		MaxRequestSize:        100,
+		MaxBodySize:           defaultMaxBodySizeMB,
 		MaxSharedInteractions: 10_000,
 	}
 }
@@ -153,4 +158,13 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("eviction-strategy must be %q or %q, got %q", EvictionSliding, EvictionFixed, c.EvictionStrategy)
 	}
 	return nil
+}
+
+// maxBodyBytes returns the stored interaction body cap in bytes.
+// Unset or invalid values fall back to defaultMaxBodySizeMB.
+func (c *Config) maxBodyBytes() int64 {
+	if c.MaxBodySize <= 0 {
+		return int64(defaultMaxBodySizeMB) * 1024 * 1024
+	}
+	return int64(c.MaxBodySize) * 1024 * 1024
 }

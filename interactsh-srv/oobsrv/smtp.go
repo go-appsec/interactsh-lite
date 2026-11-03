@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -22,6 +23,8 @@ const teeConnMaxBuf = 8192 // 8 KB cap for raw SMTP envelope capture
 const (
 	smtpReadTimeout  = time.Minute      // bound idle connections and slow DATA bodies
 	smtpWriteTimeout = 30 * time.Second // response write deadline
+
+	smtpMaxRecipients = 50 // cap RCPT commands per message; go-smtp default is unlimited
 )
 
 // teeConn wraps a net.Conn and copies Read bytes into a capped buffer.
@@ -194,11 +197,10 @@ func (s *smtpSession) Data(r io.Reader) error {
 		}
 	}
 
-	// Limit what we store but accept the full message (SIZE 0 advertised)
+	// Store at most maxBodyBytes but accept the full message (SIZE 0 advertised);
+	// go-smtp streams DATA, so this read is the only place the body is buffered
 	orig := r
-	if s.server.cfg.MaxRequestSize > 0 {
-		r = io.LimitReader(r, int64(s.server.cfg.MaxRequestSize)*1024*1024)
-	}
+	r = io.LimitReader(r, s.server.cfg.maxBodyBytes())
 	body, err := io.ReadAll(r)
 	if err != nil {
 		return err
@@ -269,9 +271,17 @@ func (s *Server) onSMTPData(from string, recipients []string, body []byte, remot
 	bodyStr := string(body)
 	now := time.Now().UTC()
 
+	// One message is stored once per domain and once per correlation ID:
+	// repeated recipients must not multiply the stored copies.
+	seen := smtpCaptureSet{recipients: map[string]struct{}{}, domains: map[string]struct{}{}, cids: map[string]struct{}{}}
+
 	var matched bool
 	for _, rcpt := range recipients {
-		if s.captureSMTPInteraction(from, rcpt, bodyStr, remoteIP, now) {
+		if _, ok := seen.recipients[rcpt]; ok {
+			continue
+		}
+		seen.recipients[rcpt] = struct{}{}
+		if s.captureSMTPInteraction(from, rcpt, bodyStr, remoteIP, now, &seen) {
 			matched = true
 		}
 	}
@@ -280,7 +290,14 @@ func (s *Server) onSMTPData(from string, recipients []string, body []byte, remot
 	}
 }
 
-func (s *Server) captureSMTPInteraction(from, rcpt, body, remoteIP string, now time.Time) bool {
+// smtpCaptureSet tracks what was already stored for one DATA payload.
+type smtpCaptureSet struct {
+	recipients map[string]struct{}
+	domains    map[string]struct{}
+	cids       map[string]struct{}
+}
+
+func (s *Server) captureSMTPInteraction(from, rcpt, body, remoteIP string, now time.Time, seen *smtpCaptureSet) bool {
 	_, recipientDomain, ok := strings.Cut(rcpt, "@")
 	if !ok {
 		return false
@@ -292,23 +309,53 @@ func (s *Server) captureSMTPInteraction(from, rcpt, body, remoteIP string, now t
 		return false
 	}
 
-	return s.captureInteraction(domain, recipientDomain, "", InteractionType{
-		Protocol:      protocolSMTP,
-		UniqueID:      recipientDomain,
-		FullId:        recipientDomain,
-		RawRequest:    body,
-		SMTPFrom:      from,
-		SMTPTo:        rcpt,
-		RemoteAddress: remoteIP,
-		Timestamp:     now,
-	}, InteractionType{
-		Protocol:      protocolSMTP,
-		RawRequest:    body,
-		SMTPFrom:      from,
-		SMTPTo:        rcpt,
-		RemoteAddress: remoteIP,
-		Timestamp:     now,
-	})
+	// Wildcard bucket: keep the message once per domain.
+	if _, ok := seen.domains[domain]; !ok {
+		seen.domains[domain] = struct{}{}
+		s.captureWildcard(domain, InteractionType{
+			Protocol:      protocolSMTP,
+			UniqueID:      recipientDomain,
+			FullId:        recipientDomain,
+			RawRequest:    body,
+			SMTPFrom:      from,
+			SMTPTo:        rcpt,
+			RemoteAddress: remoteIP,
+			Timestamp:     now,
+		})
+	}
+
+	matches := MatchCorrelationID(recipientDomain, s.cfg.CorrelationIdLength, s.cfg.Domains, s.storage.HasCorrelationID)
+
+	var stored bool
+	for _, match := range matches {
+		interaction := InteractionType{
+			Protocol:      protocolSMTP,
+			UniqueID:      match.UniqueID,
+			FullId:        match.FullID,
+			RawRequest:    body,
+			SMTPFrom:      from,
+			SMTPTo:        rcpt,
+			RemoteAddress: remoteIP,
+			Timestamp:     now,
+		}
+		// Raw message is kept only for the first unique ID per correlation ID
+		if _, ok := seen.cids[match.UniqueID]; ok {
+			interaction.RawRequest = ""
+		} else {
+			seen.cids[match.UniqueID] = struct{}{}
+		}
+		data, err := json.Marshal(interaction)
+		if err != nil {
+			s.logger.Error("failed to marshal interaction", "error", err)
+			continue
+		}
+		if err := s.storage.AppendInteraction(match.UniqueID, data); err != nil {
+			s.logger.Error("failed to store interaction", "error", err, "correlation-id", match.UniqueID)
+		} else {
+			stored = true
+		}
+	}
+	return stored
 }
 
 // smtpService wraps a go-smtp Server and its listener as a Service.
@@ -370,16 +417,15 @@ func (s *Server) startSMTP(ctx context.Context) {
 	}
 }
 
-// startSMTPPort binds and starts a single SMTP listener. Non-fatal on bind failure.
-func (s *Server) startSMTPPort(ctx context.Context, backend smtp.Backend, hostname string, port int, name string, tlsCfg *tls.Config, implicitTLS bool) {
-	addr := net.JoinHostPort(s.cfg.ListenIP, strconv.Itoa(port))
-
+// newSMTPServer builds the go-smtp server for one listener port.
+func (s *Server) newSMTPServer(backend smtp.Backend, hostname string, tlsCfg *tls.Config, implicitTLS bool) *smtp.Server {
 	smtpSrv := smtp.NewServer(backend)
 	smtpSrv.Domain = hostname
 	smtpSrv.AllowInsecureAuth = true
 	// Idle/response deadlines to bound idle-connection resource use.
 	smtpSrv.ReadTimeout = smtpReadTimeout
 	smtpSrv.WriteTimeout = smtpWriteTimeout
+	smtpSrv.MaxRecipients = smtpMaxRecipients
 	// Do not set MaxMessageBytes: advertise SIZE 0 (unlimited) so clients never refuse to send
 	// Body truncation is handled in Data()
 	smtpSrv.ErrorLog = &slogSMTPLogger{logger: s.logger}
@@ -388,6 +434,14 @@ func (s *Server) startSMTPPort(ctx context.Context, backend smtp.Backend, hostna
 	if tlsCfg != nil && !implicitTLS {
 		smtpSrv.TLSConfig = tlsCfg
 	}
+	return smtpSrv
+}
+
+// startSMTPPort binds and starts a single SMTP listener. Non-fatal on bind failure.
+func (s *Server) startSMTPPort(ctx context.Context, backend smtp.Backend, hostname string, port int, name string, tlsCfg *tls.Config, implicitTLS bool) {
+	addr := net.JoinHostPort(s.cfg.ListenIP, strconv.Itoa(port))
+
+	smtpSrv := s.newSMTPServer(backend, hostname, tlsCfg, implicitTLS)
 
 	var ln net.Listener
 	var err error

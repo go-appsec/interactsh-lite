@@ -56,6 +56,7 @@ func main() {
 		privkeyFile      string
 		originIPHeader   string
 		maxRequestSize   int
+		maxBodySize      int
 
 		// Config flags
 		configPath          string
@@ -124,6 +125,8 @@ func main() {
 	pflag.StringVar(&originIPHeader, "oih", "", "HTTP header for real client IP")
 	pflag.IntVar(&maxRequestSize, "max-request-size", defaults.MaxRequestSize, "Max request/message size in MB (0=unlimited)")
 	pflag.IntVar(&maxRequestSize, "mrs", defaults.MaxRequestSize, "Max request/message size in MB (0=unlimited)")
+	pflag.IntVar(&maxBodySize, "max-body-size", defaults.MaxBodySize, "Max stored body size in MB for captured interactions (default 8)")
+	pflag.IntVar(&maxBodySize, "mbs", defaults.MaxBodySize, "Max stored body size in MB for captured interactions (default 8)")
 
 	// Config flags
 	pflag.StringVar(&configPath, "config", "", "Config file path")
@@ -250,6 +253,9 @@ func main() {
 	}
 	if flagChanged("max-request-size", "mrs") {
 		cfg.MaxRequestSize = maxRequestSize
+	}
+	if flagChanged("max-body-size", "mbs") {
+		cfg.MaxBodySize = maxBodySize
 	}
 	if flagChanged("resolvers") {
 		cfg.Resolvers = resolvers

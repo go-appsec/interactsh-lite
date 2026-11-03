@@ -561,7 +561,7 @@ func (s *Server) captureDNSInteraction(r *dns.Msg, rawResponse string, qtype uin
 	}
 
 	rawRequest := r.String()
-	qtypeStr := dns.TypeToString[qtype]
+	qtypeStr := dns.Type(qtype).String() // TYPE<n> for types without a name
 	qnameLower := normalizeFQDN(r.Question[0].Name)
 	now := time.Now().UTC()
 
