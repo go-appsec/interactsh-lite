@@ -13,7 +13,7 @@ require (
 	github.com/mackerelio/go-osstat v0.2.8
 	github.com/miekg/dns v1.1.73
 	github.com/projectdiscovery/interactsh v1.4.0
-	github.com/spf13/pflag v1.0.10
+	github.com/spf13/pflag v1.1.0
 	github.com/stretchr/testify v1.12.1
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/vjeantet/ldapserver v1.0.2-0.20260218215457-e117373377c0
